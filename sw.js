@@ -3,7 +3,7 @@
  * 离线缓存策略：应用外壳预缓存 + 运行时 stale-while-revalidate
  * ===================================================== */
 
-const CACHE_NAME = 'shelflife-v1';
+const CACHE_NAME = 'shelflife-v3';
 
 /* 应用核心资源（相对路径，适配 GitHub Pages 子目录部署） */
 const CORE_ASSETS = [
@@ -90,7 +90,10 @@ self.addEventListener('fetch', function(event) {
         return cached || new Response('', { status: 504, statusText: 'Offline' });
       });
 
-      // 有缓存先返回，后台同步更新
+      // 导航请求优先用网络（确保最新代码），其他请求有缓存先返回
+      if (req.mode === 'navigate') {
+        return networkFetch.catch(function() { return cached; });
+      }
       return cached || networkFetch;
     })
   );
