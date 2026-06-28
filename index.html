@@ -1586,15 +1586,34 @@
             const cloudMap = {};
             cloudProducts.forEach(function(p) { cloudMap[p.id] = p; });
 
-            // 合并策略：取每个产品的最新版本，跳过已删除的
+            const now = Date.now();
             const mergedMap = {};
+
+            // 1. 保留本地商品，但如果不在云端且不在墓碑中且创建超过60秒，视为已被其他设备删除
             Object.keys(localMap).forEach(function(id) {
-                mergedMap[id] = localMap[id];
+                if (deletedIds.hasOwnProperty(id)) return; // 跳过墓碑
+                if (cloudMap[id]) {
+                    mergedMap[id] = localMap[id]; // 云端也有，保留
+                    return;
+                }
+                // 本地有但云端没有
+                var createdAt = localMap[id].createdAt || 0;
+                if (now - createdAt > 60000) {
+                    // 创建超过60秒，云端仍没有 → 被其他设备删除，标记墓碑并跳过
+                    deletedIds[id] = now;
+                    saveDeletedIds(deletedIds);
+                    if (firebaseDb) {
+                        firebaseDb.ref('users/' + user.username + '/deleted/' + id).set(now);
+                    }
+                } else {
+                    mergedMap[id] = localMap[id]; // 刚创建的，可能是还没上传，保留
+                }
             });
+
+            // 2. 合并云端商品（跳过墓碑）
             Object.keys(cloudMap).forEach(function(id) {
-                // 跳过已标记删除的商品，防止云端旧数据恢复
                 if (deletedIds.hasOwnProperty(id)) {
-                    // 云端仍有该商品则删除
+                    // 云端仍有墓碑商品则删除
                     if (firebaseDb) {
                         firebaseDb.ref('users/' + user.username + '/products/' + id).remove();
                     }
