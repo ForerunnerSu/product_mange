@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0d9488">
+    <title>超市保质期管理</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-512.jpg">
+    <link rel="icon" href="icon-512.jpg" sizes="512x512">
+    <meta name="apple-mobile-web-app-title" content="保质期管理">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
+    <!-- Firebase Compat SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+    <style>
+        /* ========== CSS 自定义属性（主题色） ========== */
+        :root {
+            --primary: #0d9488;
+            --primary-light: #14b8a6;
+            --primary-dark: #0f766e;
+            --primary-bg: #f0fdfa;
+            --danger: #ef4444;
+            --danger-bg: #fef2f2;
+            --warning: #f97316;
+            --warning-bg: #fff7ed;
+            --caution: #eab308;
+            --caution-bg: #fefce8;
+            --success: #22c55e;
+            --success-bg: #f0fdf4;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+            --white: #ffffff;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-full: 9999px;
+            --nav-height: 60px;
+            --header-height: 56px;
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        /* ========== 全局重置 ========== */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            color: var(--gray-800);
+            background: var(--gray-50);
+            height: 100%;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        input, select, textarea, button { font-family: inherit; font-size: inherit; }
+        a { text-decoration: none; color: inherit; }
+
+        /* ========== 页面容器 ========== */
+        .app-container {
+            width: 100%;
+            height: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+            background: var(--white);
+        }
+
+        /* ========== 登录/注册页面 ========== */
+        .auth-page {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1000;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, #5eead4 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+            transition: opacity 0.4s, transform 0.4s;
+        }
+        .auth-page.hidden {
+            opacity: 0;
+            transform: translateX(-100%);
+            pointer-events: none;
+        }
+        .auth-logo {
+            width: 80px; height: 80px;
+            background: var(--white);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-lg);
+        }
+        .auth-logo i { font-size: 36px; color: var(--primary); }
+        .auth-title { color: var(--white); font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .auth-subtitle { color: rgba(255,255,255,0.85); font-size: 14px; margin-bottom: 32px; }
+        .auth-card {
+            width: 100%;
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            box-shadow: var(--shadow-lg);
+        }
+        .auth-tab-bar {
+            display: flex;
+            margin-bottom: 24px;
+            background: var(--gray-100);
+            border-radius: var(--radius-sm);
+            padding: 3px;
+        }
+        .auth-tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: 600;
+            color: var(--gray-500);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .auth-tab.active {
+            background: var(--white);
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gray-600);
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            color: var(--gray-800);
+            background: var(--white);
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+        }
+        .form-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(13,148,136,0.1);
+        }
+        .form-input::placeholder { color: var(--gray-400); }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            touch-action: manipulation;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn-primary { background: var(--primary); color: var(--white); width: 100%; }
+        .btn-primary:hover { background: var(--primary-dark); }
+        .btn-danger { background: var(--danger); color: var(--white); }
+        .btn-outline { background: transparent; border: 1.5px solid var(--gray-300); color: var(--gray-600); }
+        .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-sm { padding: 8px 16px; font-size: 13px; }
+        .auth-error {
+            color: var(--danger);
+            font-size: 13px;
+            margin-bottom: 12px;
+            min-height: 20px;
+        }
+
+        /* ========== 主应用头部 ========== */
+        .app-header {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            height: var(--header-height);
+            background: var(--primary);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding-top: env(safe-area-inset-top, 0px);
+        }
+        .app-header h1 { font-size: 17px; font-weight: 700; }
+
+        /* ========== 云端同步状态指示器（头部右上角） ========== */
+        .cloud-sync-indicator {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.85);
+            cursor: pointer;
+            z-index: 101;
+        }
+        .cloud-sync-indicator i { font-size: 16px; }
+        .sync-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            position: absolute;
+            top: -1px;
+            right: -1px;
+        }
+        .sync-dot.connected { background: #4ade80; }
+        .sync-dot.disconnected { background: #f87171; }
+        .sync-dot.not-configured { background: var(--gray-400); }
+        .sync-dot.syncing {
+            background: #facc15;
+            animation: pulse-dot 1s ease-in-out infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ========== 标签栏 ========== */
+        .tab-bar {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 480px;
+            height: calc(var(--nav-height) + var(--safe-bottom));
+            padding-bottom: var(--safe-bottom);
+            background: var(--white);
+            border-top: 1px solid var(--gray-200);
+            display: flex;
+            z-index: 100;
+        }
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            color: var(--gray-400);
+            font-size: 11px;
+            cursor: pointer;
+            position: relative;
+            transition: color 0.2s;
+            padding-top: 4px;
+        }
+        .tab-item i { font-size: 20px; transition: transform 0.2s; }
+        .tab-item.active { color: var(--primary); }
+        .tab-item.active i { transform: scale(1.1); }
+        .tab-badge {
+            position: absolute;
+            top: 2px;
+            right: 50%;
+            transform: translateX(calc(50% + 10px));
+            min-width: 16px;
+            height: 16px;
+            border-radius: var(--radius-full);
+            background: var(--danger);
+            color: var(--white);
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+        }
+        .tab-badge.hidden { display: none; }
+
+        /* ========== 内容区域 ========== */
+        .tab-content-wrapper {
+            position: absolute;
+            top: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+            bottom: calc(var(--nav-height) + var(--safe-bottom));
+            left: 0; right: 0;
+            overflow: hidden;
+        }
+        .tab-content {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 16px;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+        .tab-content.active {
+            display: block;
+            opacity: 1;
+        }
+
+        /* ========== 首页 ========== */
+        .welcome-banner {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: var(--radius);
+            padding: 20px;
+            color: var(--white);
+            margin-bottom: 16px;
+        }
+        .welcome-banner h2 { font-size: 20px; margin-bottom: 4px; }
+        .welcome-banner p { opacity: 0.85; font-size: 13px; }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .summary-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .summary-card .icon-wrap {
+            width: 44px; height: 44px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .summary-card .info h3 { font-size: 22px; font-weight: 700; line-height: 1; }
+        .summary-card .info p { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+        .icon-green { background: var(--success-bg); color: var(--success); }
+        .icon-red { background: var(--danger-bg); color: var(--danger); }
+        .icon-orange { background: var(--warning-bg); color: var(--warning); }
+        .icon-yellow { background: var(--caution-bg); color: var(--caution); }
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .quick-action-btn {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px 8px;
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .quick-action-btn:active { transform: scale(0.96); }
+        .quick-action-btn .qa-icon {
+            width: 48px; height: 48px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+        .quick-action-btn span { font-size: 13px; color: var(--gray-600); font-weight: 500; }
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gray-800);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title .count-badge {
+            font-size: 12px;
+            background: var(--danger);
+            color: var(--white);
+            padding: 2px 8px;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+        }
+        .alert-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+        .alert-item .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .alert-item .alert-info { flex: 1; min-width: 0; }
+        .alert-item .alert-info .name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .alert-item .alert-info .detail { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .alert-item .days-badge {
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .badge-danger { background: var(--danger-bg); color: var(--danger); }
+        .badge-warning { background: var(--warning-bg); color: var(--warning); }
+        .badge-caution { background: var(--caution-bg); color: var(--caution); }
+        .badge-success { background: var(--success-bg); color: var(--success); }
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--gray-400);
+        }
+        .empty-state i { font-size: 48px; margin-bottom: 12px; display: block; }
+        .empty-state p { font-size: 14px; }
+
+        /* ========== 录入页 ========== */
+        .add-mode-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .add-mode-tab {
+            flex: 1;
+            padding: 12px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            text-align: center;
+            font-weight: 600;
+            color: var(--gray-500);
+            cursor: pointer;
+            background: var(--white);
+            transition: all 0.2s;
+        }
+        .add-mode-tab.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-bg);
+        }
+        .add-mode-tab i { margin-right: 6px; }
+        .form-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+        }
+        .form-row {
+            display: flex;
+            gap: 12px;
+        }
+        .form-row .form-group { flex: 1; }
+        .form-actions { margin-top: 20px; display: flex; gap: 10px; }
+        .form-actions .btn { flex: 1; }
+        .auto-calc-box {
+            background: var(--primary-bg);
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            margin-top: 16px;
+        }
+        .auto-calc-box h4 { font-size: 14px; color: var(--primary); margin-bottom: 12px; font-weight: 600; }
+        .auto-calc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            font-size: 14px;
+        }
+        .auto-calc-item .label { color: var(--gray-500); }
+        .auto-calc-item .value { font-weight: 600; }
+        .scan-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 2000;
+            background: #000;
+            display: none;
+        }
+        .scan-overlay.active { display: flex; flex-direction: column; }
+        .scan-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px;
+            padding-top: calc(16px + env(safe-area-inset-top, 0px));
+            background: rgba(0,0,0,0.5);
+            color: var(--white);
+            z-index: 10;
+        }
+        .scan-header h3 { font-size: 16px; }
+        .scan-close-btn { background: none; border: none; color: var(--white); font-size: 24px; cursor: pointer; padding: 4px 8px; }
+        #scanner-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        #scanner-container video { width: 100%; height: 100%; object-fit: cover; }
+        #scanner-container canvas.drawingBuffer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .scan-hint {
+            position: absolute;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--white);
+            font-size: 14px;
+            text-align: center;
+            text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .barcode-scan-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 10px 14px;
+            background: var(--primary-bg);
+            color: var(--primary);
+            border: 1.5px solid var(--primary);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            width: 100%;
+        }
+        .barcode-scan-btn:active { transform: scale(0.97); }
+
+        /* ========== 商品列表 ========== */
+        .filter-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .filter-bar .search-input-wrap {
+            flex: 1;
+            min-width: 150px;
+            position: relative;
+        }
+        .filter-bar .search-input-wrap i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--gray-400);
+        }
+        .filter-bar .search-input-wrap input {
+            width: 100%;
+            padding: 10px 12px 10px 36px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            outline: none;
+            background: var(--white);
+        }
+        .filter-bar .search-input-wrap input:focus { border-color: var(--primary); }
+        .filter-select {
+            padding: 10px 12px;
+            border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            outline: none;
+            background: var(--white);
+            color: var(--gray-600);
+            min-width: 80px;
+        }
+        .filter-select:focus { border-color: var(--primary); }
+        .product-card-wrapper {
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 10px;
+            border-radius: var(--radius-sm);
+        }
+        .product-card {
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            gap: 12px;
+            transition: transform 0.3s;
+            position: relative;
+            z-index: 1;
+        }
+        .product-card .pc-status-strip {
+            width: 4px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .product-card .pc-info { flex: 1; min-width: 0; }
+        .product-card .pc-name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .product-card .pc-meta { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+        .product-card .pc-meta span { margin-right: 8px; }
+        .product-card .pc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+        .pc-days { font-size: 20px; font-weight: 700; }
+        .pc-status-badge { font-size: 11px; padding: 3px 8px; border-radius: var(--radius-full); font-weight: 600; }
+        .swipe-actions {
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
+            display: flex;
+            z-index: 0;
+        }
+        .swipe-actions button {
+            width: 70px;
+            border: none;
+            color: var(--white);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .swipe-actions button i { font-size: 18px; }
+        .swipe-edit-btn { background: var(--primary); }
+        .swipe-delete-btn { background: var(--danger); }
+        .product-card.handled { opacity: 0.5; }
+
+        /* ========== 预警页 ========== */
+        .alert-section { margin-bottom: 12px; }
+        .alert-section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .alert-section-header:active { background: var(--gray-50); }
+        .alert-section-header .as-icon {
+            width: 36px; height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .alert-section-header .as-title { flex: 1; font-weight: 600; font-size: 15px; }
+        .alert-section-header .as-count {
+            padding: 3px 10px;
+            border-radius: var(--radius-full);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--white);
+        }
+        .alert-section-header .as-arrow { color: var(--gray-400); transition: transform 0.3s; }
+        .alert-section-header.expanded .as-arrow { transform: rotate(180deg); }
+        .alert-section-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .alert-section-body.expanded { max-height: 2000px; }
+        .alert-list-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: var(--white);
+            border-top: 1px solid var(--gray-100);
+            transition: opacity 0.3s;
+        }
+        .alert-list-item.handled { opacity: 0.4; }
+        .alert-list-item .ali-info { flex: 1; min-width: 0; }
+        .alert-list-item .ali-name { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .alert-list-item .ali-detail { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+        .ali-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .export-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .export-bar .btn { flex: 1; }
+
+        /* ========== 我的页面 ========== */
+        .profile-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            color: var(--white);
+        }
+        .profile-avatar {
+            width: 72px; height: 72px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        .profile-header .username { font-size: 18px; font-weight: 700; }
+        .profile-section {
+            background: var(--white);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .profile-section-title {
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--gray-500);
+            font-weight: 600;
+            background: var(--gray-50);
+        }
+        .profile-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-100);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .profile-item:last-child { border-bottom: none; }
+        .profile-item:active { background: var(--gray-50); }
+        .profile-item i { width: 24px; text-align: center; color: var(--primary); font-size: 18px; }
+        .profile-item .pi-label { flex: 1; font-size: 15px; }
+        .profile-item .pi-value { font-size: 13px; color: var(--gray-400); }
+        .profile-item .pi-arrow { color: var(--gray-300); }
+        .profile-item.danger-item i { color: var(--danger); }
+        .profile-item.danger-item .pi-label { color: var(--danger); }
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            padding: 16px;
+        }
+        .stat-item { text-align: center; }
+        .stat-item .stat-num { font-size: 24px; font-weight: 700; color: var(--primary); }
+        .stat-item .stat-label { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+        /* ========== 云端同步状态卡片（我的页面） ========== */
+        .sync-status-card {
+            background: var(--white);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+        .sync-status-card .sync-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+        .sync-status-card .sync-card-header i.sync-icon {
+            font-size: 20px;
+        }
+        .sync-status-card .sync-card-header .sync-title {
+            flex: 1;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .sync-status-card .sync-card-body {
+            padding: 12px 16px;
+        }
+        .sync-info-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--gray-600);
+        }
+        .sync-info-row .sync-info-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sync-info-row .sync-info-value {
+            font-weight: 600;
+        }
+        .sync-info-row .sync-info-value.connected { color: var(--success); }
+        .sync-info-row .sync-info-value.disconnected { color: var(--danger); }
+        .sync-info-row .sync-info-value.not-configured { color: var(--gray-400); }
+        .sync-btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--gray-100);
+        }
+        .sync-btn-row .btn { flex: 1; font-size: 13px; padding: 10px 16px; }
+
+        /* ========== 本地未配置提示横幅 ========== */
+        .local-only-banner {
+            display: none;
+            background: var(--warning-bg);
+            color: var(--warning);
+            padding: 8px 16px;
+            font-size: 12px;
+            text-align: center;
+            border-bottom: 1px solid #fed7aa;
+        }
+        .local-only-banner.show { display: block; }
+        .local-only-banner i { margin-right: 4px; }
+
+        /* ========== 弹窗/对话框 ========== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-box {
+            background: var(--white);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 320px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+        }
+        .modal-box h3 { font-size: 17px; margin-bottom: 8px; }
+        .modal-box p { font-size: 14px; color: var(--gray-500); margin-bottom: 20px; }
+        .modal-actions { display: flex; gap: 10px; }
+        .modal-actions .btn { flex: 1; }
+
+        /* ========== Toast 提示 ========== */
+        .toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: var(--gray-800);
+            color: var(--white);
+            padding: 10px 20px;
+            border-radius: var(--radius-full);
+            font-size: 14px;
+            z-index: 5000;
+            opacity: 0;
+            transition: all 0.3s;
+            white-space: nowrap;
+            max-width: 90%;
+            text-align: center;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+
+        /* ========== 下拉刷新 ========== */
+        .pull-indicator {
+            text-align: center;
+            padding: 0 0 8px 0;
+            font-size: 13px;
+            color: var(--gray-400);
+            display: none;
+        }
+        .pull-indicator.visible { display: block; }
+
+        /* ========== 关于 ========== */
+        .about-info {
+            text-align: center;
+            padding: 20px;
+            color: var(--gray-500);
+            font-size: 13px;
+        }
+        .about-info .app-name { font-size: 16px; font-weight: 600; color: var(--gray-700); margin-bottom: 4px; }
+
+        /* ========== 隐藏的文件输入 ========== */
+        .hidden-input { display: none; }
+
+        /* ========== 动画 ========== */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.3s ease; }
+
+        /* ========== 响应式 ========== */
+        @media (min-width: 480px) {
+            .app-container { box-shadow: var(--shadow-lg); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==================== 应用容器 ==================== -->
+<div class="app-container" id="app">
+
+    <!-- ========== 登录/注册页 ========== -->
+    <div class="auth-page" id="authPage">
+        <div class="auth-logo">
+            <i class="fas fa-store"></i>
+        </div>
+        <div class="auth-title">超市保质期管理</div>
+        <div class="auth-subtitle">轻松管理商品保质期，减少损耗</div>
+        <div class="auth-card">
+            <div class="auth-tab-bar">
+                <div class="auth-tab active" onclick="switchAuthTab('login')">登录</div>
+                <div class="auth-tab" onclick="switchAuthTab('register')">注册</div>
+            </div>
+            <!-- 登录表单 -->
+            <form class="auth-form active" id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" class="form-input" id="loginUsername" placeholder="请输入用户名" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-input" id="loginPassword" placeholder="请输入密码" required autocomplete="current-password">
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i> 登录
+                </button>
+            </form>
+            <!-- 注册表单 -->
+            <form class="auth-form" id="registerForm" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" class="form-input" id="regUsername" placeholder="请输入用户名（至少3位）" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" class="form-input" id="regPassword" placeholder="请输入密码（至少6位）" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input type="password" class="form-input" id="regConfirm" placeholder="请再次输入密码" required autocomplete="new-password">
+                </div>
+                <div class="auth-error" id="regError"></div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> 注册
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========== 应用头部 ========== -->
+    <div class="app-header" id="appHeader" style="display:none;">
+        <h1><i class="fas fa-store"></i> 超市保质期管理</h1>
+        <!-- 云端同步指示器 -->
+        <div class="cloud-sync-indicator" id="cloudSyncIndicator" onclick="switchTab(4); renderSyncStatusCard();" title="云端同步状态">
+            <i class="fas fa-cloud"></i>
+            <span class="sync-dot not-configured" id="headerSyncDot"></span>
+        </div>
+    </div>
+
+    <!-- ========== 本地未配置提示横幅 ========== -->
+    <div class="local-only-banner" id="localOnlyBanner">
+        <i class="fas fa-info-circle"></i> 云端同步未配置，数据仅保存在本地设备
+    </div>
+
+    <!-- ========== 标签内容区域 ========== -->
+    <div class="tab-content-wrapper" id="tabContentWrapper" style="display:none;">
+
+        <!-- ===== Tab 1: 首页 ===== -->
+        <div class="tab-content active" id="tabHome">
+            <div class="welcome-banner">
+                <h2 id="welcomeMsg">欢迎回来！</h2>
+                <p id="dateDisplay"></p>
+            </div>
+            <div class="summary-grid" id="summaryGrid">
+                <!-- 由JS动态渲染 -->
+            </div>
+            <div class="quick-actions">
+                <button class="quick-action-btn" onclick="switchTab(1); startScan()">
+                    <div class="qa-icon" style="background:var(--primary-bg);color:var(--primary);">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                    <span>扫码录入</span>
+                </button>
+                <button class="quick-action-btn" onclick="switchTab(1)">
+                    <div class="qa-icon" style="background:var(--warning-bg);color:var(--warning);">
+                        <i class="fas fa-edit"></i>
+                    </div>
+                    <span>手动录入</span>
+                </button>
+                <button class="quick-action-btn" onclick="switchTab(3)">
+                    <div class="qa-icon" style="background:var(--danger-bg);color:var(--danger);">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <span>查看预警</span>
+                </button>
+            </div>
+            <div class="section-title" id="recentAlertsTitle">
+                <i class="fas fa-exclamation-triangle" style="color:var(--danger);"></i>
+                最近预警
+            </div>
+            <div id="recentAlertsList">
+                <!-- 由JS动态渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== Tab 2: 录入 ===== -->
+        <div class="tab-content" id="tabAdd">
+            <div class="add-mode-tabs">
+                <div class="add-mode-tab active" id="modeScanTab" onclick="switchAddMode('scan')">
+                    <i class="fas fa-camera"></i> 扫码录入
+                </div>
+                <div class="add-mode-tab" id="modeManualTab" onclick="switchAddMode('manual')">
+                    <i class="fas fa-keyboard"></i> 手动录入
+                </div>
+            </div>
+
+            <!-- 扫码模式内容 -->
+            <div id="scanModeContent">
+                <div class="form-card">
+                    <p style="color:var(--gray-500);text-align:center;margin-bottom:16px;">点击下方按钮打开相机扫描条码</p>
+                    <button class="barcode-scan-btn" onclick="startScan()">
+                        <i class="fas fa-camera"></i> 打开相机扫码
+                    </button>
+                </div>
+            </div>
+
+            <!-- 手动录入表单 -->
+            <div id="manualModeContent" style="display:none;">
+                <form class="form-card" id="productForm" onsubmit="handleProductSubmit(event)">
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> 商品名称 *</label>
+                        <input type="text" class="form-input" id="pName" placeholder="如：伊利纯牛奶" required>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> 商品类别 *</label>
+                        <select class="form-input" id="pCategory" required>
+                            <option value="">请选择类别</option>
+                            <option>面包</option><option>火腿肠</option><option>方便面</option>
+                            <option>饮用水</option><option>饮料</option><option>膨化食品</option>
+                            <option>牛奶</option><option>酸奶</option><option>零食</option>
+                            <option>调味品</option><option>罐头</option><option>饼干</option>
+                            <option>糖果</option><option>果冻</option><option>其他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-barcode"></i> 条码</label>
+                        <input type="text" class="form-input" id="pBarcode" placeholder="输入或扫码获取">
+                        <button type="button" class="barcode-scan-btn" onclick="startScan()" style="margin-top:8px;">
+                            <i class="fas fa-camera"></i> 扫描条码
+                        </button>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label><i class="fas fa-calendar"></i> 生产日期 *</label>
+                            <input type="date" class="form-input" id="pProdDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-clock"></i> 保质期(天) *</label>
+                            <input type="number" class="form-input" id="pShelfLife" placeholder="如：365" min="1" required>
+                        </div>
+                    </div>
+                    <div class="auto-calc-box" id="autoCalcBox" style="display:none;">
+                        <h4><i class="fas fa-calculator"></i> 自动计算结果</h4>
+                        <div class="auto-calc-item">
+                            <span class="label">到期日期：</span>
+                            <span class="value" id="calcExpiryDate">--</span>
+                        </div>
+                        <div class="auto-calc-item">
+                            <span class="label">剩余天数：</span>
+                            <span class="value" id="calcRemainDays">--</span>
+                        </div>
+                        <div class="auto-calc-item">
+                            <span class="label">预警状态：</span>
+                            <span class="value" id="calcStatus">--</span>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:16px;">
+                        <label><i class="fas fa-map-marker-alt"></i> 货架位置</label>
+                        <input type="text" class="form-input" id="pShelf" placeholder="如：A区-2排-3层">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-sticky-note"></i> 备注</label>
+                        <input type="text" class="form-input" id="pNotes" placeholder="可选填写备注信息">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-outline" onclick="resetProductForm()">
+                            <i class="fas fa-undo"></i> 重置
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-plus"></i> 添加商品
+                        </button>
+                    </div>
+                    <input type="hidden" id="editProductId" value="">
+                </form>
+            </div>
+        </div>
+
+        <!-- ===== Tab 3: 商品列表 ===== -->
+        <div class="tab-content" id="tabProducts">
+            <div class="filter-bar">
+                <div class="search-input-wrap">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="搜索商品名称或条码" oninput="renderProductList()">
+                </div>
+                <select class="filter-select" id="filterCategory" onchange="renderProductList()">
+                    <option value="">全部类别</option>
+                    <option>面包</option><option>火腿肠</option><option>方便面</option>
+                    <option>饮用水</option><option>饮料</option><option>膨化食品</option>
+                    <option>牛奶</option><option>酸奶</option><option>零食</option>
+                    <option>调味品</option><option>罐头</option><option>饼干</option>
+                    <option>糖果</option><option>果冻</option><option>其他</option>
+                </select>
+                <select class="filter-select" id="filterStatus" onchange="renderProductList()">
+                    <option value="">全部状态</option>
+                    <option value="safe">安全</option>
+                    <option value="caution">临近到期</option>
+                    <option value="warning">即将到期</option>
+                    <option value="expired">已过期</option>
+                </select>
+            </div>
+            <div class="pull-indicator" id="pullIndicator">下拉刷新...</div>
+            <div id="productList">
+                <!-- 由JS动态渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== Tab 4: 预警 ===== -->
+        <div class="tab-content" id="tabAlerts">
+            <div class="export-bar">
+                <button class="btn btn-outline btn-sm" onclick="exportAlertsCSV()">
+                    <i class="fas fa-file-csv"></i> 导出预警CSV
+                </button>
+                <button class="btn btn-outline btn-sm" onclick="markAllHandled()">
+                    <i class="fas fa-check-double"></i> 全部标记已处理
+                </button>
+            </div>
+            <div id="alertsContainer">
+                <!-- 由JS动态渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== Tab 5: 我的 ===== -->
+        <div class="tab-content" id="tabProfile">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="username" id="profileUsername">--</div>
+            </div>
+
+            <div class="stats-row" style="background:var(--white);border-radius:var(--radius);margin-bottom:16px;box-shadow:var(--shadow-sm);">
+                <div class="stat-item">
+                    <div class="stat-num" id="statTotal">0</div>
+                    <div class="stat-label">商品总数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-num" id="statCategories">0</div>
+                    <div class="stat-label">类别数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-num" id="statAlerts">0</div>
+                    <div class="stat-label">预警数</div>
+                </div>
+            </div>
+
+            <!-- ===== 数据同步状态卡片 ===== -->
+            <div class="sync-status-card" id="syncStatusCard">
+                <div class="sync-card-header">
+                    <i class="fas fa-cloud sync-icon" id="syncCardIcon" style="color:var(--gray-400);"></i>
+                    <span class="sync-title">数据同步状态</span>
+                    <i class="fas fa-chevron-right pi-arrow" style="color:var(--gray-300);"></i>
+                </div>
+                <div class="sync-card-body" id="syncCardBody">
+                    <!-- 由JS动态渲染 -->
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <div class="profile-section-title">数据管理</div>
+                <div class="profile-item" onclick="exportAllData()">
+                    <i class="fas fa-download"></i>
+                    <span class="pi-label">导出数据</span>
+                    <span class="pi-value">JSON</span>
+                    <i class="fas fa-chevron-right pi-arrow"></i>
+                </div>
+                <div class="profile-item" onclick="triggerImportData()">
+                    <i class="fas fa-upload"></i>
+                    <span class="pi-label">导入数据</span>
+                    <span class="pi-value">JSON</span>
+                    <i class="fas fa-chevron-right pi-arrow"></i>
+                </div>
+                <div class="profile-item danger-item" onclick="confirmClearData()">
+                    <i class="fas fa-trash-alt"></i>
+                    <span class="pi-label">清空数据</span>
+                    <i class="fas fa-chevron-right pi-arrow"></i>
+                </div>
+            </div>
+
+            <div class="profile-section">
+                <div class="profile-section-title">账户</div>
+                <div class="profile-item danger-item" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span class="pi-label">退出登录</span>
+                    <i class="fas fa-chevron-right pi-arrow"></i>
+                </div>
+            </div>
+
+            <div class="about-info">
+                <div class="app-name">超市保质期管理</div>
+                <p>版本 2.0.0 (含云端同步)</p>
+                <p style="margin-top:4px;" id="aboutSyncInfo">数据存储于本地，无需联网</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== 底部标签栏 ========== -->
+    <div class="tab-bar" id="tabBar" style="display:none;">
+        <div class="tab-item active" data-tab="0" onclick="switchTab(0)">
+            <i class="fas fa-home"></i>
+            <span>首页</span>
+            <div class="tab-badge hidden" id="badgeHome">0</div>
+        </div>
+        <div class="tab-item" data-tab="1" onclick="switchTab(1)">
+            <i class="fas fa-plus-circle"></i>
+            <span>录入</span>
+        </div>
+        <div class="tab-item" data-tab="2" onclick="switchTab(2)">
+            <i class="fas fa-box"></i>
+            <span>商品</span>
+        </div>
+        <div class="tab-item" data-tab="3" onclick="switchTab(3)">
+            <i class="fas fa-bell"></i>
+            <span>预警</span>
+            <div class="tab-badge hidden" id="badgeAlerts">0</div>
+        </div>
+        <div class="tab-item" data-tab="4" onclick="switchTab(4)">
+            <i class="fas fa-user"></i>
+            <span>我的</span>
+        </div>
+    </div>
+
+    <!-- ========== 扫码覆盖层 ========== -->
+    <div class="scan-overlay" id="scanOverlay">
+        <div class="scan-header">
+            <button class="scan-close-btn" onclick="stopScan()"><i class="fas fa-times"></i></button>
+            <h3>扫描条码</h3>
+            <div style="width:32px;"></div>
+        </div>
+        <div id="scanner-container"></div>
+        <div class="scan-hint">将条码对准框内，自动识别</div>
+    </div>
+
+    <!-- ========== 模态对话框 ========== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-box">
+            <h3 id="modalTitle">确认</h3>
+            <p id="modalMessage">确定要执行此操作吗？</p>
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeModal()">取消</button>
+                <button class="btn btn-danger" id="modalConfirmBtn" onclick="modalConfirmAction()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== Toast 提示 ========== -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ========== 隐藏文件输入 ========== -->
+    <input type="file" class="hidden-input" id="importFileInput" accept=".json" onchange="handleImportFile(event)">
+</div>
+
+<!-- ==================== JavaScript ==================== -->
+<script>
+(function() {
+    'use strict';
+
+    /*
+     * =====================================================
+     * Firebase 配置
+     * =====================================================
+     * 请将以下配置替换为您自己的 Firebase 项目配置。
+     * 获取方式：Firebase 控制台 -> 项目设置 -> 常规 -> 您的应用
+     *
+     * 推荐的 Firebase Realtime Database 安全规则（在 Firebase 控制台 -> Realtime Database -> 规则 中设置）:
+     * {
+     *   "rules": {
+     *     "users": {
+     *       "$username": {
+     *         ".read": true,
+     *         ".write": "auth != null && auth.uid === $username",
+     *         ".indexOn": ["categoryId", "expiryDate", "status"]
+     *       }
+     *     }
+     *   }
+     * }
+     *
+     * 注意：由于本应用使用应用层用户名/密码认证，如需上述严格安全规则，
+     * 需同时集成 Firebase Authentication。当前版本使用简化规则即可正常工作：
+     * {
+     *   "rules": {
+     *     "users": {
+     *       ".read": true,
+     *       ".write": true,
+     *       "$username": {
+     *         ".indexOn": ["categoryId", "expiryDate", "status"]
+     *       }
+     *     }
+     *   }
+     * }
+     */
+    const firebaseConfig = {
+        apiKey: "BHeYRuwz3iDlBuW41T_HJhxpxl-QFenuapKdbk7A2jOSon0HgwdXbXSfYxJlQsFDr5Ijh34H_KvROHc5CtTTjOw",
+        authDomain: "product-mange-9fc2e.firebaseapp.com",
+        databaseURL: "https://product-mange-9fc2e-default-rtdb.firebaseio.com",
+        projectId: "product-mange-9fc2e",
+        storageBucket: "product-mange-9fc2e.appspot.com",
+        messagingSenderId: "",
+        appId: ""
+    };
+
+    /* ========== 常量定义 ========== */
+    const CATEGORIES = ['面包','火腿肠','方便面','饮用水','饮料','膨化食品','牛奶','酸奶','零食','调味品','罐头','饼干','糖果','果冻','其他'];
+    const LS_KEYS = {
+        PRODUCTS: 'shelflife_products',
+        USER: 'shelflife_user',
+        SESSION: 'shelflife_session',
+        LAST_SYNC: 'shelflife_last_sync',
+        SYNC_STATUS: 'shelflife_sync_status'
+    };
+
+    /* ========== Firebase 状态管理 ========== */
+    let firebaseApp = null;
+    let firebaseDb = null;
+    let firebaseInitialized = false;
+    let firebaseConfigured = false;
+    let firebaseConnected = false;
+    let firebaseProductsListener = null;
+    let isSyncingFromCloud = false; // 防止云端数据覆盖本地时触发回写
+
+    // 检测 Firebase 是否已配置（非占位符值）
+    function isFirebaseConfigured() {
+        return firebaseConfig.apiKey !== 'YOUR_API_KEY' && firebaseConfig.databaseURL !== 'https://YOUR_PROJECT-default-rtdb.firebaseio.com';
+    }
+
+    // 初始化 Firebase
+    function initFirebase() {
+        if (!isFirebaseConfigured()) {
+            console.log('Firebase 未配置，使用本地存储模式');
+            firebaseConfigured = false;
+            return;
+        }
+
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            firebaseDb = firebase.database();
+            firebaseConfigured = true;
+            firebaseInitialized = true;
+
+            // 监听连接状态
+            firebaseDb.ref('.info/connected').on('value', function(snapshot) {
+                firebaseConnected = snapshot.val() === true;
+                updateSyncIndicator();
+                if (firebaseConnected) {
+                    console.log('Firebase 已连接');
+                    // 恢复网络后尝试同步
+                    syncLocalToCloud();
+                } else {
+                    console.log('Firebase 连接断开');
+                }
+            });
+        } catch (err) {
+            console.error('Firebase 初始化失败:', err);
+            firebaseConfigured = false;
+            firebaseInitialized = false;
+        }
+    }
+
+    // 获取当前同步状态
+    function getSyncStatus() {
+        if (!firebaseConfigured) return 'not-configured';
+        if (!firebaseConnected) return 'disconnected';
+        return 'connected';
+    }
+
+    // 获取同步状态中文名
+    function getSyncStatusLabel(status) {
+        switch(status) {
+            case 'connected': return '已连接';
+            case 'disconnected': return '已断开';
+            case 'not-configured': return '未配置';
+            default: return '未知';
+        }
+    }
+
+    // 更新同步指示器（头部右上角）
+    function updateSyncIndicator() {
+        const dot = document.getElementById('headerSyncDot');
+        const status = getSyncStatus();
+        dot.className = 'sync-dot ' + status;
+    }
+
+    // 渲染同步状态卡片（我的页面）
+    window.renderSyncStatusCard = function() {
+        const body = document.getElementById('syncCardBody');
+        const icon = document.getElementById('syncCardIcon');
+        const status = getSyncStatus();
+        const lastSync = localStorage.getItem(LS_KEYS.LAST_SYNC);
+        const lastSyncText = lastSync ? new Date(parseInt(lastSync)).toLocaleString('zh-CN') : '从未同步';
+        const aboutInfo = document.getElementById('aboutSyncInfo');
+
+        let iconColor = 'var(--gray-400)';
+        if (status === 'connected') iconColor = 'var(--success)';
+        else if (status === 'disconnected') iconColor = 'var(--danger)';
+        icon.style.color = iconColor;
+
+        if (!firebaseConfigured) {
+            body.innerHTML = `
+                <div class="sync-info-row">
+                    <span class="sync-info-label"><i class="fas fa-circle" style="font-size:8px;color:var(--gray-400);"></i> 同步状态</span>
+                    <span class="sync-info-value not-configured">未配置</span>
+                </div>
+                <div class="sync-info-row">
+                    <span class="sync-info-label"><i class="fas fa-clock"></i> 上次同步</span>
+                    <span class="sync-info-value">${lastSyncText}</span>
+                </div>
+                <div style="font-size:12px;color:var(--gray-400);margin-top:8px;padding:8px;background:var(--gray-50);border-radius:var(--radius-sm);">
+                    <i class="fas fa-info-circle"></i> 请在代码中配置 Firebase 项目信息以启用云端同步功能。配置后数据可在多设备间实时同步。
+                </div>
+            `;
+            aboutInfo.textContent = '数据存储于本地，无需联网';
+        } else {
+            const statusClass = status;
+            body.innerHTML = `
+                <div class="sync-info-row">
+                    <span class="sync-info-label"><i class="fas fa-circle" style="font-size:8px;color:${status === 'connected' ? 'var(--success)' : 'var(--danger)'};"></i> 同步状态</span>
+                    <span class="sync-info-value ${statusClass}">${getSyncStatusLabel(status)}</span>
+                </div>
+                <div class="sync-info-row">
+                    <span class="sync-info-label"><i class="fas fa-clock"></i> 上次同步</span>
+                    <span class="sync-info-value">${lastSyncText}</span>
+                </div>
+                <div class="sync-btn-row">
+                    <button class="btn btn-primary btn-sm" onclick="manualSyncNow()">
+                        <i class="fas fa-sync-alt"></i> 立即同步
+                    </button>
+                </div>
+            `;
+            aboutInfo.textContent = status === 'connected' ? '已开启云端同步' : '云端同步已断开，数据暂存本地';
+        }
+    };
+
+    // 手动立即同步
+    window.manualSyncNow = function() {
+        if (!firebaseConfigured || !firebaseConnected) {
+            showToast('云端同步不可用', 'error');
+            return;
+        }
+        showToast('正在同步...', 'success');
+        syncLocalToCloud();
+    };
+
+    // 设置 Firebase 实时数据监听器
+    function setupFirebaseListener() {
+        if (!firebaseConfigured || !firebaseDb) return;
+
+        const user = getCurrentUser();
+        if (!user) return;
+
+        // 移除旧监听器
+        if (firebaseProductsListener) {
+            firebaseProductsListener.off();
+            firebaseProductsListener = null;
+        }
+
+        const userProductsRef = firebaseDb.ref('users/' + user.username + '/products');
+        firebaseProductsListener = userProductsRef;
+
+        // 监听云端数据变化
+        userProductsRef.on('value', function(snapshot) {
+            if (isSyncingFromCloud) return; // 防止循环
+
+            const cloudData = snapshot.val();
+            if (cloudData === null) {
+                // 云端无数据，如果本地有数据则上传
+                const localProducts = getProducts();
+                if (localProducts.length > 0) {
+                    syncLocalToCloud();
+                }
+                return;
+            }
+
+            // 将云端数据转为数组
+            const cloudProducts = Object.keys(cloudData).map(function(key) {
+                return { ...cloudData[key], id: key };
+            });
+
+            // 冲突解决：last write wins（基于 updatedAt 时间戳）
+            isSyncingFromCloud = true;
+            const localProducts = getProducts();
+            const localMap = {};
+            localProducts.forEach(function(p) { localMap[p.id] = p; });
+
+            const cloudMap = {};
+            cloudProducts.forEach(function(p) { cloudMap[p.id] = p; });
+
+            // 合并策略：取每个产品的最新版本
+            const mergedMap = {};
+            Object.keys(localMap).forEach(function(id) {
+                mergedMap[id] = localMap[id];
+            });
+            Object.keys(cloudMap).forEach(function(id) {
+                if (!mergedMap[id] || (cloudMap[id].updatedAt || 0) > (mergedMap[id].updatedAt || 0)) {
+                    mergedMap[id] = cloudMap[id];
+                }
+            });
+
+            const mergedProducts = Object.values(mergedMap);
+            saveProducts(mergedProducts);
+            localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
+            isSyncingFromCloud = false;
+
+            refreshAllData();
+        }, function(error) {
+            console.error('Firebase 监听出错:', error);
+        });
+    }
+
+    // 将本地数据同步到云端
+    function syncLocalToCloud() {
+        if (!firebaseConfigured || !firebaseDb) return;
+        const user = getCurrentUser();
+        if (!user) return;
+
+        const products = getProducts();
+        isSyncingFromCloud = true;
+
+        // 将数组转为对象（以 id 为 key）
+        const productsObj = {};
+        products.forEach(function(p) {
+            const { id, ...rest } = p;
+            productsObj[id] = rest;
+        });
+
+        firebaseDb.ref('users/' + user.username + '/products').set(productsObj)
+            .then(function() {
+                localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
+                localStorage.setItem(LS_KEYS.SYNC_STATUS, 'connected');
+                console.log('数据已同步到云端');
+                showToast('云端同步完成', 'success');
+            })
+            .catch(function(err) {
+                console.error('云端同步失败:', err);
+                showToast('云端同步失败，数据已保存本地', 'error');
+            })
+            .finally(function() {
+                isSyncingFromCloud = false;
+                updateSyncIndicator();
+            });
+    }
+
+    // 上传单个产品到云端
+    function uploadProductToCloud(productId, productData) {
+        if (!firebaseConfigured || !firebaseDb) return;
+        const user = getCurrentUser();
+        if (!user) return;
+
+        const { id, ...rest } = productData;
+        firebaseDb.ref('users/' + user.username + '/products/' + productId).set(rest)
+            .then(function() {
+                localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
+            })
+            .catch(function(err) {
+                console.error('上传单个产品失败:', err);
+            });
+    }
+
+    // 从云端删除单个产品
+    function removeProductFromCloud(productId) {
+        if (!firebaseConfigured || !firebaseDb) return;
+        const user = getCurrentUser();
+        if (!user) return;
+
+        firebaseDb.ref('users/' + user.username + '/products/' + productId).remove()
+            .then(function() {
+                localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
+            })
+            .catch(function(err) {
+                console.error('从云端删除产品失败:', err);
+            });
+    }
+
+    // 检查云端是否存在用户（用于跨设备登录）
+    function checkCloudUser(username) {
+        return new Promise(function(resolve) {
+            if (!firebaseConfigured || !firebaseDb) {
+                resolve(null);
+                return;
+            }
+            firebaseDb.ref('users/' + username + '/auth').once('value', function(snapshot) {
+                resolve(snapshot.val());
+            }).catch(function() {
+                resolve(null);
+            });
+        });
+    }
+
+    // 注册用户信息到云端（含密码哈希，用于跨设备登录验证）
+    function registerUserToCloud(username, passwordHash) {
+        if (!firebaseConfigured || !firebaseDb) return;
+        firebaseDb.ref('users/' + username + '/auth').set({
+            username: username,
+            passwordHash: passwordHash || '',
+            createdAt: Date.now()
+        }).catch(function(err) {
+            console.error('注册用户到云端失败:', err);
+        });
+    }
+
+    // 从云端下载用户产品数据
+    function downloadCloudProducts(username) {
+        return new Promise(function(resolve) {
+            if (!firebaseConfigured || !firebaseDb) {
+                resolve([]);
+                return;
+            }
+            firebaseDb.ref('users/' + username + '/products').once('value', function(snapshot) {
+                const data = snapshot.val();
+                if (!data) {
+                    resolve([]);
+                    return;
+                }
+                const products = Object.keys(data).map(function(key) {
+                    return { ...data[key], id: key };
+                });
+                resolve(products);
+            }).catch(function() {
+                resolve([]);
+            });
+        });
+    }
+
+    // 退出时清理 Firebase 监听器
+    function cleanupFirebaseListener() {
+        if (firebaseProductsListener) {
+            firebaseProductsListener.off();
+            firebaseProductsListener = null;
+        }
+    }
+
+    /* ========== 工具函数 ========== */
+
+    // SHA-256 哈希（使用 Web Crypto API，带回退方案）
+    async function sha256(message) {
+        if (window.crypto && window.crypto.subtle) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await window.crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        // 回退方案：简单哈希（非生产环境级别，但比明文存储好）
+        let hash = 0;
+        for (let i = 0; i < message.length; i++) {
+            const char = message.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash |= 0;
+        }
+        return 'fallback_' + Math.abs(hash).toString(36);
+    }
+
+    // 生成唯一ID
+    function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    }
+
+    // 格式化日期
+    function formatDate(dateStr) {
+        if (!dateStr) return '--';
+        const d = new Date(dateStr);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    // 计算剩余天数
+    function calcRemainingDays(expiryDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiry = new Date(expiryDate);
+        expiry.setHours(0, 0, 0, 0);
+        const diff = expiry.getTime() - today.getTime();
+        return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+
+    // 计算到期日期
+    function calcExpiryDate(prodDate, shelfLifeDays) {
+        const d = new Date(prodDate);
+        d.setDate(d.getDate() + parseInt(shelfLifeDays));
+        return d.toISOString().split('T')[0];
+    }
+
+    // 获取状态
+    function getStatus(remainingDays) {
+        if (remainingDays < 0) return { key: 'expired', label: '已过期', color: 'red', badgeClass: 'badge-danger' };
+        if (remainingDays <= 7) return { key: 'warning', label: '即将到期', color: 'orange', badgeClass: 'badge-warning' };
+        if (remainingDays <= 30) return { key: 'caution', label: '临近到期', color: 'yellow', badgeClass: 'badge-caution' };
+        return { key: 'safe', label: '安全', color: 'green', badgeClass: 'badge-success' };
+    }
+
+    /* ========== 数据管理 ========== */
+
+    // 获取所有商品
+    function getProducts() {
+        try {
+            return JSON.parse(localStorage.getItem(LS_KEYS.PRODUCTS)) || [];
+        } catch(e) {
+            return [];
+        }
+    }
+
+    // 保存所有商品
+    function saveProducts(products) {
+        localStorage.setItem(LS_KEYS.PRODUCTS, JSON.stringify(products));
+    }
+
+    // 获取当前用户
+    function getCurrentUser() {
+        try {
+            return JSON.parse(localStorage.getItem(LS_KEYS.SESSION));
+        } catch(e) {
+            return null;
+        }
+    }
+
+    /* ========== 认证系统 ========== */
+
+    // 切换登录/注册标签
+    window.switchAuthTab = function(tab) {
+        document.querySelectorAll('.auth-tab').forEach(function(el) {
+            el.classList.toggle('active', el.textContent === (tab === 'login' ? '登录' : '注册'));
+        });
+        document.getElementById('loginForm').classList.toggle('active', tab === 'login');
+        document.getElementById('registerForm').classList.toggle('active', tab === 'register');
+    };
+
+    /* ========== 本地用户管理 ========== */
+    var USERS_KEY = 'shelflife_users';
+    function getLocalUsers() {
+        try { return JSON.parse(localStorage.getItem(USERS_KEY)) || {}; }
+        catch(e) { return {}; }
+    }
+    function saveLocalUsers(users) {
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+
+    /* ========== 登录 ========== */
+    window.handleLogin = async function(event) {
+        event.preventDefault();
+        var username = document.getElementById('loginUsername').value.trim();
+        var password = document.getElementById('loginPassword').value;
+        var errorEl = document.getElementById('loginError');
+        errorEl.textContent = '';
+        if (!username || !password) { errorEl.textContent = '请填写用户名和密码'; return; }
+
+        // 1. 本地查找
+        var users = getLocalUsers();
+        var localUser = users[username];
+        if (localUser) {
+            var hash = await sha256(password);
+            if (hash === localUser.passwordHash) {
+                var session = { username: username, loginAt: Date.now() };
+                localStorage.setItem(LS_KEYS.SESSION, JSON.stringify(session));
+                initApp(session);
+                return;
+            }
+            errorEl.textContent = '密码错误';
+            return;
+        }
+
+        // 2. 云端查找（跨设备登录）
+        var cloudUser = await checkCloudUser(username);
+        if (cloudUser) {
+            if (cloudUser.passwordHash) {
+                var hash2 = await sha256(password);
+                if (hash2 === cloudUser.passwordHash) {
+                    users[username] = { username: username, passwordHash: cloudUser.passwordHash };
+                    saveLocalUsers(users);
+                    var cloudProducts = await downloadCloudProducts(username);
+                    if (cloudProducts.length > 0) saveProducts(cloudProducts);
+                    var session2 = { username: username, loginAt: Date.now() };
+                    localStorage.setItem(LS_KEYS.SESSION, JSON.stringify(session2));
+                    initApp(session2);
+                    return;
+                }
+                errorEl.textContent = '密码错误';
+                return;
+            }
+            errorEl.textContent = '请在注册设备上登录或重新注册';
+            return;
+        }
+        errorEl.textContent = '用户不存在，请先注册';
+    };
+
+    /* ========== 注册 ========== */
+    window.handleRegister = async function(event) {
+        event.preventDefault();
+        var username = document.getElementById('regUsername').value.trim();
+        var password = document.getElementById('regPassword').value;
+        var confirmPwd = document.getElementById('regConfirm').value;
+        var errorEl = document.getElementById('regError');
+        errorEl.textContent = '';
+        if (username.length < 3) { errorEl.textContent = '用户名至少3个字符'; return; }
+        if (password.length < 6) { errorEl.textContent = '密码至少6个字符'; return; }
+        if (password !== confirmPwd) { errorEl.textContent = '两次密码不一致'; return; }
+
+        var users = getLocalUsers();
+        if (users[username]) { errorEl.textContent = '用户名已存在'; return; }
+        var cloudUser = await checkCloudUser(username);
+        if (cloudUser) { errorEl.textContent = '用户名已存在'; return; }
+
+        var hash = await sha256(password);
+        users[username] = { username: username, passwordHash: hash };
+        saveLocalUsers(users);
+        registerUserToCloud(username, hash);
+
+        var session = { username: username, loginAt: Date.now() };
+        localStorage.setItem(LS_KEYS.SESSION, JSON.stringify(session));
+        initApp(session);
+    };
+
+    /* ========== 退出登录 ========== */
+    window.handleLogout = function() {
+        showModal('退出登录', '确定要退出登录吗？', function() {
+            cleanupFirebaseListener();
+            localStorage.removeItem(LS_KEYS.SESSION);
+            showAuthPage();
+        });
+    };
+
+    /* ========== 页面切换 ========== */
+    function showAuthPage() {
+        document.getElementById('authPage').classList.remove('hidden');
+        document.getElementById('appHeader').style.display = 'none';
+        document.getElementById('tabBar').style.display = 'none';
+        document.getElementById('tabContentWrapper').style.display = 'none';
+        document.getElementById('localOnlyBanner').classList.remove('show');
+        document.getElementById('loginUsername').value = '';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('regUsername').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('regConfirm').value = '';
+        document.getElementById('loginError').textContent = '';
+        document.getElementById('regError').textContent = '';
+        window.switchAuthTab('login');
+    }
+
+    function initApp(user) {
+        document.getElementById('authPage').classList.add('hidden');
+        document.getElementById('appHeader').style.display = 'flex';
+        document.getElementById('tabBar').style.display = 'flex';
+        document.getElementById('tabContentWrapper').style.display = 'block';
+
+        var banner = document.getElementById('localOnlyBanner');
+        if (isFirebaseConfigured()) banner.classList.remove('show');
+        else banner.classList.add('show');
+
+        initFirebase();
+        setupFirebaseListener();
+        updateSyncIndicator();
+
+        // 如果本地已注册用户但云端没有认证信息，自动补传（迁移场景）
+        if (firebaseConfigured && user && user.username) {
+            var localUsers = getLocalUsers();
+            var localUser = localUsers[user.username];
+            if (localUser && localUser.passwordHash) {
+                checkCloudUser(user.username).then(function(cloudUser) {
+                    if (!cloudUser || !cloudUser.passwordHash) {
+                        registerUserToCloud(user.username, localUser.passwordHash);
+                        console.log('认证数据已补传到云端');
+                    }
+                });
+            }
+        }
+
+        // 绑定自动计算
+        var pd = document.getElementById('pProdDate');
+        var sl = document.getElementById('pShelfLife');
+        if (pd && !pd._ac) { pd.addEventListener('input', autoCalc); pd._ac = true; }
+        if (sl && !sl._ac) { sl.addEventListener('input', autoCalc); sl._ac = true; }
+
+        renderHome();
+        renderProfile();
+        updateBadges();
+    }
+
+    /* ========== 标签切换 ========== */
+    var tabIds = ['tabHome', 'tabAdd', 'tabProducts', 'tabAlerts', 'tabProfile'];
+    window.switchTab = function(index) {
+        tabIds.forEach(function(id, i) {
+            var el = document.getElementById(id);
+            if (el) el.classList.toggle('active', i === index);
+        });
+        document.querySelectorAll('.tab-item').forEach(function(item) {
+            item.classList.toggle('active', parseInt(item.dataset.tab) === index);
+        });
+        if (index === 0) renderHome();
+        else if (index === 2) renderProductList();
+        else if (index === 3) renderAlerts();
+        else if (index === 4) renderProfile();
+    };
+
+    /* ========== 录入模式 ========== */
+    window.switchAddMode = function(mode) {
+        document.getElementById('modeScanTab').classList.toggle('active', mode === 'scan');
+        document.getElementById('modeManualTab').classList.toggle('active', mode === 'manual');
+        document.getElementById('scanModeContent').style.display = mode === 'scan' ? 'block' : 'none';
+        document.getElementById('manualModeContent').style.display = mode === 'manual' ? 'block' : 'none';
+    };
+
+    /* ========== 扫码 ========== */
+    window.startScan = function() {
+        var overlay = document.getElementById('scanOverlay');
+        overlay.classList.add('active');
+        if (typeof Quagga === 'undefined') {
+            showToast('扫码组件未加载', 'error');
+            window.stopScan();
+            return;
+        }
+        Quagga.init({
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#scanner-container'), constraints: { facingMode: "environment" } },
+            decoder: { readers: ["ean_reader", "ean_8_reader", "upc_reader", "upc_e_reader", "code_128_reader"] }
+        }, function(err) {
+            if (err) { console.error(err); showToast('无法启动摄像头', 'error'); window.stopScan(); return; }
+            Quagga.start();
+        });
+        Quagga.onDetected(function(data) {
+            if (data && data.codeResult && data.codeResult.code) {
+                var code = data.codeResult.code;
+                document.getElementById('pBarcode').value = code;
+                window.stopScan();
+                window.switchAddMode('manual');
+                showToast('扫码成功: ' + code, 'success');
+            }
+        });
+    };
+
+    window.stopScan = function() {
+        document.getElementById('scanOverlay').classList.remove('active');
+        if (typeof Quagga !== 'undefined') { try { Quagga.stop(); } catch(e) {} }
+        var c = document.getElementById('scanner-container');
+        if (c) c.innerHTML = '';
+    };
+
+    /* ========== 自动计算 ========== */
+    function autoCalc() {
+        var prodDate = document.getElementById('pProdDate').value;
+        var shelfLife = document.getElementById('pShelfLife').value;
+        var box = document.getElementById('autoCalcBox');
+        if (prodDate && shelfLife && parseInt(shelfLife) > 0) {
+            var expiry = calcExpiryDate(prodDate, parseInt(shelfLife));
+            var remain = calcRemainingDays(expiry);
+            var status = getStatus(remain);
+            box.style.display = 'block';
+            document.getElementById('calcExpiryDate').textContent = expiry;
+            document.getElementById('calcRemainDays').textContent = remain + ' 天';
+            document.getElementById('calcStatus').textContent = status.label;
+        } else {
+            box.style.display = 'none';
+        }
+    }
+
+    /* ========== 商品增删改 ========== */
+    window.handleProductSubmit = function(event) {
+        event.preventDefault();
+        var name = document.getElementById('pName').value.trim();
+        var category = document.getElementById('pCategory').value;
+        var barcode = document.getElementById('pBarcode').value.trim();
+        var prodDate = document.getElementById('pProdDate').value;
+        var shelfLife = document.getElementById('pShelfLife').value;
+        var shelf = document.getElementById('pShelf').value.trim();
+        var notes = document.getElementById('pNotes').value.trim();
+        var editId = document.getElementById('editProductId').value;
+
+        if (!name || !category || !prodDate || !shelfLife) {
+            showToast('请填写必填项', 'error');
+            return;
+        }
+
+        var expiryDate = calcExpiryDate(prodDate, parseInt(shelfLife));
+        var now = Date.now();
+        var product = {
+            name: name, category: category, barcode: barcode,
+            prodDate: prodDate, shelfLife: parseInt(shelfLife),
+            expiryDate: expiryDate, shelf: shelf, notes: notes,
+            handled: false, updatedAt: now
+        };
+
+        var products = getProducts();
+        if (editId) {
+            var idx = products.findIndex(function(p) { return p.id === editId; });
+            if (idx >= 0) {
+                product.id = editId;
+                product.createdAt = products[idx].createdAt;
+                product.handled = products[idx].handled;
+                products[idx] = product;
+            }
+        } else {
+            product.id = generateId();
+            product.createdAt = now;
+            products.push(product);
+        }
+
+        saveProducts(products);
+        uploadProductToCloud(product.id, product);
+        resetProductForm();
+        showToast(editId ? '商品更新成功' : '商品添加成功', 'success');
+        switchTab(2);
+    };
+
+    window.resetProductForm = function() {
+        document.getElementById('pName').value = '';
+        document.getElementById('pCategory').value = '';
+        document.getElementById('pBarcode').value = '';
+        document.getElementById('pProdDate').value = '';
+        document.getElementById('pShelfLife').value = '';
+        document.getElementById('pShelf').value = '';
+        document.getElementById('pNotes').value = '';
+        document.getElementById('editProductId').value = '';
+        document.getElementById('autoCalcBox').style.display = 'none';
+        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-plus"></i> 添加商品';
+    };
+
+    window.editProduct = function(id) {
+        var products = getProducts();
+        var product = products.find(function(p) { return p.id === id; });
+        if (!product) return;
+        switchTab(1);
+        window.switchAddMode('manual');
+        document.getElementById('pName').value = product.name || '';
+        document.getElementById('pCategory').value = product.category || '';
+        document.getElementById('pBarcode').value = product.barcode || '';
+        document.getElementById('pProdDate').value = product.prodDate || '';
+        document.getElementById('pShelfLife').value = product.shelfLife || '';
+        document.getElementById('pShelf').value = product.shelf || '';
+        document.getElementById('pNotes').value = product.notes || '';
+        document.getElementById('editProductId').value = id;
+        document.getElementById('submitBtn').innerHTML = '<i class="fas fa-save"></i> 保存修改';
+        autoCalc();
+    };
+
+    window.deleteProduct = function(id) {
+        showModal('删除商品', '确定要删除这个商品吗？', function() {
+            var products = getProducts();
+            var filtered = products.filter(function(p) { return p.id !== id; });
+            saveProducts(filtered);
+            removeProductFromCloud(id);
+            renderProductList();
+            renderHome();
+            updateBadges();
+            showToast('已删除', 'success');
+        });
+    };
+
+    /* ========== 渲染辅助 ========== */
+    function statusColorVar(key) {
+        switch(key) {
+            case 'expired': return 'var(--danger)';
+            case 'warning': return 'var(--warning)';
+            case 'caution': return 'var(--caution)';
+            default: return 'var(--success)';
+        }
+    }
+
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function downloadFile(filename, content, mime) {
+        var blob = new Blob([content], { type: mime });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a); URL.revokeObjectURL(url);
+    }
+
+    /* ========== 首页渲染 ========== */
+    function renderHome() {
+        var user = getCurrentUser();
+        document.getElementById('welcomeMsg').textContent = user ? '欢迎回来，' + user.username + '！' : '欢迎回来！';
+        var now = new Date();
+        document.getElementById('dateDisplay').textContent = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+
+        var products = getProducts();
+        var expired = 0, warning = 0, caution = 0, safe = 0;
+        products.forEach(function(p) {
+            if (p.handled) return;
+            var s = getStatus(calcRemainingDays(p.expiryDate));
+            if (s.key === 'expired') expired++;
+            else if (s.key === 'warning') warning++;
+            else if (s.key === 'caution') caution++;
+            else safe++;
+        });
+
+        document.getElementById('summaryGrid').innerHTML =
+            '<div class="summary-card"><div class="icon-wrap icon-green"><i class="fas fa-box"></i></div><div class="info"><h3>' + products.length + '</h3><p>商品总数</p></div></div>' +
+            '<div class="summary-card"><div class="icon-wrap icon-red"><i class="fas fa-exclamation-circle"></i></div><div class="info"><h3>' + expired + '</h3><p>已过期</p></div></div>' +
+            '<div class="summary-card"><div class="icon-wrap icon-orange"><i class="fas fa-exclamation-triangle"></i></div><div class="info"><h3>' + warning + '</h3><p>即将到期</p></div></div>' +
+            '<div class="summary-card"><div class="icon-wrap icon-yellow"><i class="fas fa-clock"></i></div><div class="info"><h3>' + caution + '</h3><p>临近到期</p></div></div>' +
+            '<div class="summary-card"><div class="icon-wrap icon-green"><i class="fas fa-check-circle"></i></div><div class="info"><h3>' + safe + '</h3><p>安全</p></div></div>';
+
+        var alertProducts = products.filter(function(p) {
+            if (p.handled) return false;
+            return calcRemainingDays(p.expiryDate) <= 7;
+        }).sort(function(a, b) {
+            return calcRemainingDays(a.expiryDate) - calcRemainingDays(b.expiryDate);
+        }).slice(0, 5);
+
+        var alertList = document.getElementById('recentAlertsList');
+        var titleEl = document.getElementById('recentAlertsTitle');
+        if (alertProducts.length === 0) {
+            titleEl.style.display = 'none';
+            alertList.innerHTML = '';
+        } else {
+            titleEl.style.display = 'flex';
+            alertList.innerHTML = alertProducts.map(function(p) {
+                var remain = calcRemainingDays(p.expiryDate);
+                var s = getStatus(remain);
+                var daysText = remain < 0 ? '已过期' + Math.abs(remain) + '天' : '剩' + remain + '天';
+                return '<div class="alert-item">' +
+                    '<div class="status-dot" style="background:' + statusColorVar(s.key) + ';"></div>' +
+                    '<div class="alert-info"><div class="name">' + escapeHtml(p.name) + '</div>' +
+                    '<div class="detail">' + escapeHtml(p.category) + ' · 到期' + formatDate(p.expiryDate) + '</div></div>' +
+                    '<div class="days-badge ' + s.badgeClass + '">' + daysText + '</div></div>';
+            }).join('');
+        }
+    }
+
+    /* ========== 商品列表渲染 ========== */
+    window.renderProductList = function() {
+        var products = getProducts();
+        var search = (document.getElementById('searchInput').value || '').toLowerCase();
+        var filterCat = document.getElementById('filterCategory').value;
+        var filterStatus = document.getElementById('filterStatus').value;
+
+        var filtered = products.filter(function(p) {
+            if (search && !p.name.toLowerCase().includes(search) && !(p.barcode || '').toLowerCase().includes(search)) return false;
+            if (filterCat && p.category !== filterCat) return false;
+            if (filterStatus && getStatus(calcRemainingDays(p.expiryDate)).key !== filterStatus) return false;
+            return true;
+        });
+        filtered.sort(function(a, b) { return calcRemainingDays(a.expiryDate) - calcRemainingDays(b.expiryDate); });
+
+        var list = document.getElementById('productList');
+        if (filtered.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400);"><i class="fas fa-inbox" style="font-size:48px;margin-bottom:12px;"></i><p>暂无商品数据</p></div>';
+            return;
+        }
+        list.innerHTML = filtered.map(function(p) {
+            var remain = calcRemainingDays(p.expiryDate);
+            var s = getStatus(remain);
+            var daysText = remain < 0 ? Math.abs(remain) : remain;
+            return '<div class="product-card-wrapper">' +
+                '<div class="product-card' + (p.handled ? ' handled' : '') + '">' +
+                '<div class="pc-status-strip" style="background:' + statusColorVar(s.key) + ';"></div>' +
+                '<div class="pc-info"><div class="pc-name">' + escapeHtml(p.name) + '</div>' +
+                '<div class="pc-meta"><span><i class="fas fa-list"></i> ' + escapeHtml(p.category) + '</span>' +
+                '<span><i class="fas fa-calendar"></i> 到期' + formatDate(p.expiryDate) + '</span>' +
+                (p.shelf ? '<span><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(p.shelf) + '</span>' : '') + '</div></div>' +
+                '<div class="pc-right"><div class="pc-days" style="color:' + statusColorVar(s.key) + ';">' + daysText + '</div>' +
+                '<div class="pc-status-badge ' + s.badgeClass + '">' + s.label + '</div></div></div>' +
+                '<div class="swipe-actions">' +
+                '<button class="swipe-edit-btn" onclick="editProduct(\'' + p.id + '\')"><i class="fas fa-edit"></i>编辑</button>' +
+                '<button class="swipe-delete-btn" onclick="deleteProduct(\'' + p.id + '\')"><i class="fas fa-trash"></i>删除</button>' +
+                '</div></div>';
+        }).join('');
+    };
+
+    /* ========== 预警渲染 ========== */
+    function renderAlerts() {
+        var products = getProducts();
+        var unhandled = products.filter(function(p) { return !p.handled; });
+        var expired = [], warning = [], caution = [];
+        unhandled.forEach(function(p) {
+            var s = getStatus(calcRemainingDays(p.expiryDate));
+            if (s.key === 'expired') expired.push(p);
+            else if (s.key === 'warning') warning.push(p);
+            else if (s.key === 'caution') caution.push(p);
+        });
+
+        var container = document.getElementById('alertsContainer');
+        if (expired.length === 0 && warning.length === 0 && caution.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400);"><i class="fas fa-check-circle" style="font-size:48px;margin-bottom:12px;color:var(--success);"></i><p>暂无预警商品</p></div>';
+            return;
+        }
+
+        function renderSection(title, icon, items, color, bgColor, badgeClass) {
+            if (items.length === 0) return '';
+            return '<div class="alert-section">' +
+                '<div class="alert-section-header expanded" onclick="toggleAlertSection(this)">' +
+                '<div class="as-icon" style="background:' + bgColor + ';color:' + color + ';"><i class="fas ' + icon + '"></i></div>' +
+                '<span class="as-title">' + title + '</span>' +
+                '<span class="as-count" style="background:' + color + ';">' + items.length + '</span>' +
+                '<i class="fas fa-chevron-down as-arrow"></i></div>' +
+                '<div class="alert-section-body expanded">' +
+                items.map(function(p) {
+                    var remain = calcRemainingDays(p.expiryDate);
+                    var daysText = remain < 0 ? '已过期' + Math.abs(remain) + '天' : '剩' + remain + '天';
+                    return '<div class="alert-item" style="background:var(--white);border-radius:var(--radius-sm);margin-bottom:8px;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-sm);">' +
+                        '<div class="status-dot" style="background:' + color + ';"></div>' +
+                        '<div class="alert-info"><div class="name">' + escapeHtml(p.name) + '</div>' +
+                        '<div class="detail">' + escapeHtml(p.category) + ' · 到期' + formatDate(p.expiryDate) + (p.shelf ? ' · ' + escapeHtml(p.shelf) : '') + '</div></div>' +
+                        '<div class="days-badge ' + badgeClass + '">' + daysText + '</div>' +
+                        '<button onclick="toggleHandled(\'' + p.id + '\')" style="border:none;background:var(--gray-100);color:var(--gray-600);padding:6px 10px;border-radius:var(--radius-sm);font-size:12px;cursor:pointer;flex-shrink:0;"><i class="fas fa-check"></i></button>' +
+                        '</div>';
+                }).join('') + '</div></div>';
+        }
+
+        container.innerHTML =
+            renderSection('已过期', 'fa-exclamation-circle', expired, 'var(--danger)', 'var(--danger-bg)', 'badge-danger') +
+            renderSection('即将到期', 'fa-exclamation-triangle', warning, 'var(--warning)', 'var(--warning-bg)', 'badge-warning') +
+            renderSection('临近到期', 'fa-clock', caution, 'var(--caution)', 'var(--caution-bg)', 'badge-caution');
+    }
+
+    window.toggleAlertSection = function(headerEl) {
+        var body = headerEl.nextElementSibling;
+        headerEl.classList.toggle('expanded');
+        if (body) body.classList.toggle('expanded');
+    };
+
+    window.toggleHandled = function(id) {
+        var products = getProducts();
+        var idx = products.findIndex(function(p) { return p.id === id; });
+        if (idx >= 0) {
+            products[idx].handled = !products[idx].handled;
+            products[idx].updatedAt = Date.now();
+            saveProducts(products);
+            uploadProductToCloud(id, products[idx]);
+            renderAlerts();
+            renderHome();
+            updateBadges();
+        }
+    };
+
+    window.exportAlertsCSV = function() {
+        var products = getProducts();
+        var alertProducts = products.filter(function(p) {
+            if (p.handled) return false;
+            return calcRemainingDays(p.expiryDate) <= 30;
+        });
+        if (alertProducts.length === 0) { showToast('暂无预警商品可导出', 'error'); return; }
+        var csv = '\uFEFF商品名称,类别,条码,生产日期,保质期(天),到期日期,剩余天数,状态,货架位置,备注\n';
+        alertProducts.forEach(function(p) {
+            var remain = calcRemainingDays(p.expiryDate);
+            var s = getStatus(remain);
+            csv += [p.name, p.category, p.barcode || '', p.prodDate, p.shelfLife, p.expiryDate, remain, s.label, p.shelf || '', p.notes || '']
+                .map(function(v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',') + '\n';
+        });
+        downloadFile('预警商品_' + formatDate(new Date().toISOString()) + '.csv', csv, 'text/csv;charset=utf-8');
+        showToast('CSV导出成功', 'success');
+    };
+
+    window.markAllHandled = function() {
+        showModal('全部标记已处理', '确定将所有预警商品标记为已处理吗？', function() {
+            var products = getProducts();
+            var changed = false;
+            products.forEach(function(p) {
+                if (!p.handled && calcRemainingDays(p.expiryDate) <= 30) {
+                    p.handled = true; p.updatedAt = Date.now(); changed = true;
+                }
+            });
+            if (changed) {
+                saveProducts(products);
+                syncLocalToCloud();
+                renderAlerts(); renderHome(); updateBadges();
+                showToast('已全部标记为已处理', 'success');
+            }
+        });
+    };
+
+    /* ========== 我的页面渲染 ========== */
+    function renderProfile() {
+        var user = getCurrentUser();
+        document.getElementById('profileUsername').textContent = user ? user.username : '--';
+        var products = getProducts();
+        document.getElementById('statTotal').textContent = products.length;
+        var cats = {};
+        products.forEach(function(p) { cats[p.category] = true; });
+        document.getElementById('statCategories').textContent = Object.keys(cats).length;
+        var alertCount = products.filter(function(p) {
+            if (p.handled) return false;
+            return calcRemainingDays(p.expiryDate) <= 7;
+        }).length;
+        document.getElementById('statAlerts').textContent = alertCount;
+        renderSyncStatusCard();
+    }
+
+    /* ========== 数据导入导出 ========== */
+    window.exportAllData = function() {
+        var data = { exportDate: new Date().toISOString(), productCount: getProducts().length, products: getProducts() };
+        downloadFile('保质期数据_' + formatDate(new Date().toISOString()) + '.json', JSON.stringify(data, null, 2), 'application/json');
+        showToast('数据导出成功', 'success');
+    };
+
+    window.triggerImportData = function() {
+        document.getElementById('importFileInput').click();
+    };
+
+    window.handleImportFile = function(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                var data = JSON.parse(e.target.result);
+                var products = data.products || data;
+                if (!Array.isArray(products)) throw new Error('格式错误');
+                showModal('导入数据', '确定导入' + products.length + '条数据吗？这将覆盖当前数据。', function() {
+                    saveProducts(products);
+                    syncLocalToCloud();
+                    refreshAllData();
+                    showToast('数据导入成功', 'success');
+                });
+            } catch(err) { showToast('文件格式错误', 'error'); }
+        };
+        reader.readAsText(file);
+        event.target.value = '';
+    };
+
+    window.confirmClearData = function() {
+        showModal('清空数据', '确定要清空所有商品数据吗？此操作不可恢复！', function() {
+            saveProducts([]);
+            syncLocalToCloud();
+            refreshAllData();
+            showToast('数据已清空', 'success');
+        });
+    };
+
+    /* ========== UI 工具 ========== */
+    var toastTimer = null;
+    function showToast(msg, type) {
+        var toast = document.getElementById('toast');
+        toast.textContent = msg;
+        toast.className = 'toast show' + (type ? ' ' + type : '');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { toast.classList.remove('show'); }, 2500);
+    }
+
+    var modalConfirmCallback = null;
+    function showModal(title, message, onConfirm) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalMessage').textContent = message;
+        modalConfirmCallback = onConfirm;
+        document.getElementById('modalOverlay').classList.add('active');
+    }
+    window.closeModal = function() {
+        document.getElementById('modalOverlay').classList.remove('active');
+        modalConfirmCallback = null;
+    };
+    window.modalConfirmAction = function() {
+        var cb = modalConfirmCallback;
+        modalConfirmCallback = null;
+        document.getElementById('modalOverlay').classList.remove('active');
+        if (cb) cb();
+    };
+
+    function updateBadges() {
+        var products = getProducts();
+        var alertCount = products.filter(function(p) {
+            if (p.handled) return false;
+            return calcRemainingDays(p.expiryDate) <= 7;
+        }).length;
+        var badge = document.getElementById('badgeAlerts');
+        if (alertCount > 0) { badge.textContent = alertCount; badge.classList.remove('hidden'); }
+        else { badge.classList.add('hidden'); }
+    }
+
+    function refreshAllData() {
+        renderHome();
+        renderProductList();
+        renderAlerts();
+        renderProfile();
+        renderSyncStatusCard();
+        updateBadges();
+    }
+
+    /* ========== 启动 ========== */
+    function bootstrap() {
+        var user = getCurrentUser();
+        if (user && user.username) initApp(user);
+        else showAuthPage();
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(function(reg) {
+                console.log('SW registered:', reg.scope);
+            }).catch(function(err) { console.log('SW registration failed:', err); });
+        }
+    }
+
+    bootstrap();
+
+})();
+</script>
+</body>
+</html>
