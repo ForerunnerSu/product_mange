@@ -1405,7 +1405,8 @@
         SESSION: 'shelflife_session',
         LAST_SYNC: 'shelflife_last_sync',
         SYNC_STATUS: 'shelflife_sync_status',
-        LIBRARY: 'shelflife_library'
+        LIBRARY: 'shelflife_library',
+        DELETED_IDS: 'shelflife_deleted_ids'
     };
 
     /* ========== Firebase 状态管理 ========== */
@@ -1577,18 +1578,27 @@
             // 冲突解决：last write wins（基于 updatedAt 时间戳）
             isSyncingFromCloud = true;
             const localProducts = getProducts();
+            const deletedIds = getDeletedIds();
             const localMap = {};
             localProducts.forEach(function(p) { localMap[p.id] = p; });
 
             const cloudMap = {};
             cloudProducts.forEach(function(p) { cloudMap[p.id] = p; });
 
-            // 合并策略：取每个产品的最新版本
+            // 合并策略：取每个产品的最新版本，跳过已删除的
             const mergedMap = {};
             Object.keys(localMap).forEach(function(id) {
                 mergedMap[id] = localMap[id];
             });
             Object.keys(cloudMap).forEach(function(id) {
+                // 跳过已标记删除的商品，防止云端旧数据恢复
+                if (deletedIds.hasOwnProperty(id)) {
+                    // 云端仍有该商品则删除
+                    if (firebaseDb) {
+                        firebaseDb.ref('users/' + user.username + '/products/' + id).remove();
+                    }
+                    return;
+                }
                 if (!mergedMap[id] || (cloudMap[id].updatedAt || 0) > (mergedMap[id].updatedAt || 0)) {
                     mergedMap[id] = cloudMap[id];
                 }
@@ -1883,6 +1893,46 @@
         }
     }
 
+    /* ========== 删除墓碑（防止已删除商品被云端同步恢复） ========== */
+
+    // 获取已删除ID集合
+    function getDeletedIds() {
+        try {
+            return JSON.parse(localStorage.getItem(LS_KEYS.DELETED_IDS)) || {};
+        } catch(e) {
+            return {};
+        }
+    }
+
+    // 保存已删除ID集合
+    function saveDeletedIds(deletedMap) {
+        // 只保留最近7天的墓碑，避免无限增长
+        var cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        Object.keys(deletedMap).forEach(function(id) {
+            if (deletedMap[id] < cutoff) delete deletedMap[id];
+        });
+        localStorage.setItem(LS_KEYS.DELETED_IDS, JSON.stringify(deletedMap));
+    }
+
+    // 标记商品为已删除
+    function markAsDeleted(productId) {
+        var deleted = getDeletedIds();
+        deleted[productId] = Date.now();
+        saveDeletedIds(deleted);
+    }
+
+    // 检查商品是否已被删除
+    function isDeleted(productId) {
+        return getDeletedIds().hasOwnProperty(productId);
+    }
+
+    // 从墓碑中移除（商品重新添加时）
+    function unmarkDeleted(productId) {
+        var deleted = getDeletedIds();
+        delete deleted[productId];
+        saveDeletedIds(deleted);
+    }
+
     // 获取当前用户
     function getCurrentUser() {
         try {
@@ -1946,7 +1996,20 @@
                     users[username] = { username: username, passwordHash: cloudUser.passwordHash };
                     saveLocalUsers(users);
                     var cloudProducts = await downloadCloudProducts(username);
-                    if (cloudProducts.length > 0) saveProducts(cloudProducts);
+                    if (cloudProducts.length > 0) {
+                        // 合并而非覆盖：跳过已删除的商品，保留本地新增
+                        var deletedIds = getDeletedIds();
+                        var localProducts = getProducts();
+                        var localMap = {};
+                        localProducts.forEach(function(p) { localMap[p.id] = p; });
+                        cloudProducts.forEach(function(cp) {
+                            if (deletedIds.hasOwnProperty(cp.id)) return; // 跳过已删除
+                            if (!localMap[cp.id] || (cp.updatedAt || 0) > (localMap[cp.id].updatedAt || 0)) {
+                                localMap[cp.id] = cp;
+                            }
+                        });
+                        saveProducts(Object.values(localMap));
+                    }
                     // 同步商品库
                     var cloudLibrary = await downloadCloudLibrary(username);
                     if (Object.keys(cloudLibrary).length > 0) {
@@ -2206,6 +2269,7 @@
         }
 
         saveProducts(products);
+        unmarkDeleted(product.id);  // 新增/编辑时清除墓碑
         uploadProductToCloud(product.id, product);
         // 自动保存到商品库（扫码匹配用）
         saveToLibrary(product);
@@ -2246,10 +2310,11 @@
     };
 
     window.deleteProduct = function(id) {
-        showModal('删除商品', '确定要删除这个商品吗？', function() {
+        showModal('删除商品', '确定要删除这个商品吗？删除后将在所有设备同步删除。', function() {
             var products = getProducts();
             var filtered = products.filter(function(p) { return p.id !== id; });
             saveProducts(filtered);
+            markAsDeleted(id);  // 标记墓碑，防止云端同步恢复
             removeProductFromCloud(id);
             renderProductList();
             renderHome();
