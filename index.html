@@ -2410,6 +2410,9 @@
 
     /* ========== 启动 ========== */
     function bootstrap() {
+        // 先初始化 Firebase，确保登录页可以执行云端用户验证
+        initFirebase();
+
         var user = getCurrentUser();
         if (user && user.username) initApp(user);
         else showAuthPage();
