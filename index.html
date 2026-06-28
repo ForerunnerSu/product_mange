@@ -1431,6 +1431,11 @@
             firebaseConfigured = false;
             return;
         }
+        // 防止重复初始化
+        if (firebaseInitialized) {
+            firebaseConfigured = true;
+            return;
+        }
 
         try {
             firebaseApp = firebase.initializeApp(firebaseConfig);
@@ -1665,7 +1670,7 @@
         });
     }
 
-    // 将本地数据同步到云端
+    // 将本地数据同步到云端（按id粒度写，不覆盖其他设备新增的数据）
     function syncLocalToCloud() {
         if (!firebaseConfigured || !firebaseDb) return;
         const user = getCurrentUser();
@@ -1674,35 +1679,40 @@
         const products = getProducts();
         isSyncingFromCloud = true;
 
-        // 将数组转为对象（以 id 为 key）
-        const productsObj = {};
-        products.forEach(function(p) {
-            const { id, ...rest } = p;
-            productsObj[id] = rest;
-        });
+        // 先下载云端现有数据，计算差异后按id粒度写入
+        firebaseDb.ref('users/' + user.username + '/products').once('value').then(function(snapshot) {
+            const cloudData = snapshot.val() || {};
+            const cloudMap = {};
+            Object.keys(cloudData).forEach(function(k) { cloudMap[k] = cloudData[k]; });
 
-        firebaseDb.ref('users/' + user.username + '/products').set(productsObj)
-            .then(function() {
-                localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
-                localStorage.setItem(LS_KEYS.SYNC_STATUS, 'connected');
-                console.log('数据已同步到云端');
-                showToast('云端同步完成', 'success');
-            })
-            .catch(function(err) {
-                console.error('云端同步失败:', err);
-                showToast('云端同步失败，数据已保存本地', 'error');
-            })
-            .finally(function() {
-                isSyncingFromCloud = false;
-                updateSyncIndicator();
+            const promises = [];
+            // 1. 上传/更新本地所有商品
+            products.forEach(function(p) {
+                const { id, ...rest } = p;
+                // 只在本地版本更新时写入
+                if (!cloudMap[id] || (rest.updatedAt || 0) > (cloudMap[id].updatedAt || 0)) {
+                    promises.push(firebaseDb.ref('users/' + user.username + '/products/' + id).set(rest));
+                }
             });
+            return Promise.all(promises);
+        }).then(function() {
+            localStorage.setItem(LS_KEYS.LAST_SYNC, Date.now().toString());
+            localStorage.setItem(LS_KEYS.SYNC_STATUS, 'connected');
+            console.log('数据已同步到云端');
+        }).catch(function(err) {
+            console.error('云端同步失败:', err);
+        }).finally(function() {
+            isSyncingFromCloud = false;
+            updateSyncIndicator();
+        });
     }
 
-    // 上传单个产品到云端
-    function uploadProductToCloud(productId, productData) {
+    // 上传单个产品到云端（带重试）
+    function uploadProductToCloud(productId, productData, retryCount) {
         if (!firebaseConfigured || !firebaseDb) return;
         const user = getCurrentUser();
         if (!user) return;
+        retryCount = retryCount || 0;
 
         const { id, ...rest } = productData;
         firebaseDb.ref('users/' + user.username + '/products/' + productId).set(rest)
@@ -1711,6 +1721,12 @@
             })
             .catch(function(err) {
                 console.error('上传单个产品失败:', err);
+                // 失败后重试最多3次，每次间隔递增
+                if (retryCount < 3) {
+                    setTimeout(function() {
+                        uploadProductToCloud(productId, productData, retryCount + 1);
+                    }, (retryCount + 1) * 2000);
+                }
             });
     }
 
@@ -2156,9 +2172,13 @@
 
     /* ========== 退出登录 ========== */
     window.handleLogout = function() {
-        showModal('退出登录', '确定要退出登录吗？', function() {
+        showModal('退出登录', '确定要退出登录吗？\n（本地数据将被清除，重新登录后从云端恢复）', function() {
             cleanupFirebaseListener();
+            // 清除所有本地数据，防止下一用户看到上一用户数据
             localStorage.removeItem(LS_KEYS.SESSION);
+            localStorage.removeItem(LS_KEYS.PRODUCTS);
+            localStorage.removeItem(LS_KEYS.LIBRARY);
+            localStorage.removeItem(LS_KEYS.DELETED_IDS);
             showAuthPage();
         });
     };
@@ -2430,6 +2450,12 @@
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
+    // 转义字符串用于JS字符串字面量（防止XSS注入）
+    function escapeJs(str) {
+        if (str == null) return '';
+        return String(str).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'\\"').replace(/\n/g,'\\n').replace(/\r/g,'\\r');
+    }
+
     function downloadFile(filename, content, mime) {
         var blob = new Blob([content], { type: mime });
         var url = URL.createObjectURL(blob);
@@ -2527,11 +2553,11 @@
                 '<div class="pc-status-badge ' + s.badgeClass + '">' + s.label + '</div>' +
                 '<div style="font-size:10px;color:var(--gray-400);margin-top:2px;">' + daysLabel + '</div></div></div>' +
                 '<div class="pc-actions">' +
-                '<button class="pc-btn-edit" onclick="editProduct(\'' + p.id + '\')"><i class="fas fa-edit"></i>编辑</button>' +
+                '<button class="pc-btn-edit" onclick="editProduct(\'' + escapeJs(p.id) + '\')"><i class="fas fa-edit"></i>编辑</button>' +
                 (p.handled
-                    ? '<button class="pc-btn-handle" onclick="toggleHandled(\'' + p.id + '\')"><i class="fas fa-undo"></i>恢复</button>'
-                    : '<button class="pc-btn-handle" onclick="toggleHandled(\'' + p.id + '\')"><i class="fas fa-check"></i>已处理</button>') +
-                '<button class="pc-btn-delete" onclick="deleteProduct(\'' + p.id + '\')"><i class="fas fa-trash"></i>删除</button>' +
+                    ? '<button class="pc-btn-handle" onclick="toggleHandled(\'' + escapeJs(p.id) + '\')"><i class="fas fa-undo"></i>恢复</button>'
+                    : '<button class="pc-btn-handle" onclick="toggleHandled(\'' + escapeJs(p.id) + '\')"><i class="fas fa-check"></i>已处理</button>') +
+                '<button class="pc-btn-delete" onclick="deleteProduct(\'' + escapeJs(p.id) + '\')"><i class="fas fa-trash"></i>删除</button>' +
                 '</div></div>';
         }).join('');
     };
@@ -2574,8 +2600,8 @@
                         '<div class="days-badge ' + badgeClass + '" style="flex-shrink:0;">' + daysText + '</div>' +
                         '</div>' +
                         '<div class="pc-actions" style="border-top:1px solid var(--gray-100);">' +
-                        '<button class="pc-btn-handle" onclick="toggleHandled(\'' + p.id + '\')" style="font-size:12px;padding:8px;"><i class="fas fa-check"></i>标记已处理</button>' +
-                        '<button class="pc-btn-edit" onclick="editProduct(\'' + p.id + '\')" style="font-size:12px;padding:8px;"><i class="fas fa-edit"></i>编辑</button>' +
+                        '<button class="pc-btn-handle" onclick="toggleHandled(\'' + escapeJs(p.id) + '\')" style="font-size:12px;padding:8px;"><i class="fas fa-check"></i>标记已处理</button>' +
+                        '<button class="pc-btn-edit" onclick="editProduct(\'' + escapeJs(p.id) + '\')" style="font-size:12px;padding:8px;"><i class="fas fa-edit"></i>编辑</button>' +
                         '</div></div>';
                 }).join('') + '</div></div>';
         }
@@ -2686,7 +2712,7 @@
                     '<div style="font-size:12px;color:var(--gray-500);margin-top:2px;">' + escapeHtml(item.category) + ' · 保质期' + (item.shelfLife || '?') + '天 · 条码' + escapeHtml(code) + '</div>' +
                     (item.shelf ? '<div style="font-size:12px;color:var(--gray-400);margin-top:2px;"><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(item.shelf) + '</div>' : '') +
                     '</div>' +
-                    '<button onclick="deleteLibraryEntryUI(\'' + code.replace(/'/g, "\\'") + '\')" style="border:none;background:var(--danger-bg);color:var(--danger);padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0;"><i class="fas fa-trash"></i></button>' +
+                    '<button onclick="deleteLibraryEntryUI(\'' + escapeJs(code) + '\')" style="border:none;background:var(--danger-bg);color:var(--danger);padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;flex-shrink:0;"><i class="fas fa-trash"></i></button>' +
                     '</div>';
             }).join('');
         }
