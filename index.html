@@ -2442,16 +2442,25 @@
             return;
         }
 
+        // 防止重复创建
+        if (voiceRecognition) {
+            try { voiceRecognition.abort(); } catch(e) {}
+            voiceRecognition = null;
+        }
+
         voiceRecognition = new SpeechRecognition();
         voiceRecognition.lang = 'zh-CN';
         voiceRecognition.continuous = false;
         voiceRecognition.interimResults = true;
+        voiceRecognition.maxAlternatives = 1;
 
         var btn = document.getElementById('voiceBtn');
         var btnText = document.getElementById('voiceBtnText');
         var resultDiv = document.getElementById('voiceResult');
         var resultText = document.getElementById('voiceResultText');
         var resultHint = document.getElementById('voiceResultHint');
+        var hasResult = false;
+        var hasError = false;
 
         btn.classList.add('recording');
         btn.querySelector('i').className = 'fas fa-stop';
@@ -2462,6 +2471,7 @@
         resultHint.textContent = '';
 
         voiceRecognition.onresult = function(event) {
+            hasResult = true;
             var finalText = '';
             var interimText = '';
             for (var i = 0; i < event.results.length; i++) {
@@ -2481,19 +2491,38 @@
         };
 
         voiceRecognition.onerror = function(event) {
-            var msg = '语音识别出错';
-            if (event.error === 'no-speech') msg = '没有检测到语音，请重试';
-            else if (event.error === 'not-allowed') msg = '请允许麦克风权限';
+            hasError = true;
+            var errorMap = {
+                'no-speech': '没有检测到语音，请靠近麦克风重试',
+                'not-allowed': '请允许麦克风权限（浏览器地址栏左侧图标设置）',
+                'service-not-allowed': '语音服务不可用，请使用Chrome浏览器',
+                'network': '网络错误，请检查网络连接',
+                'audio-capture': '麦克风设备错误，请检查麦克风',
+                'aborted': '录音已取消',
+                'language-not-supported': '不支持中文识别'
+            };
+            var msg = errorMap[event.error] || ('语音识别出错: ' + (event.error || '未知错误'));
+            console.log('Voice error:', event.error, event.message || '');
             resultText.textContent = msg;
-            resultHint.innerHTML = '';
-            stopVoiceInput();
+            resultHint.innerHTML = '<i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> 点击按钮重试';
         };
 
         voiceRecognition.onend = function() {
+            if (!hasError && !hasResult) {
+                resultText.textContent = '没有检测到语音，请点击按钮重试';
+                resultHint.innerHTML = '<i class="fas fa-info-circle" style="color:var(--gray-500)"></i> 请靠近麦克风说话';
+            }
             stopVoiceInput();
         };
 
-        voiceRecognition.start();
+        try {
+            voiceRecognition.start();
+        } catch(e) {
+            console.error('Failed to start recognition:', e);
+            resultText.textContent = '启动语音识别失败，请刷新页面重试';
+            resultHint.innerHTML = '<i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> ' + (e.message || '未知错误');
+            stopVoiceInput();
+        }
     }
 
     function stopVoiceInput() {
