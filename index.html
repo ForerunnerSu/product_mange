@@ -524,6 +524,44 @@
             box-shadow: 0 4px 14px rgba(239,68,68,0.4);
             animation: voicePulse 1.2s infinite;
         }
+        .voice-btn-row {
+            margin-top: 10px;
+        }
+        .smart-input-wrap {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+        .smart-input {
+            flex: 1;
+            border: 2px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px;
+            font-size: 14px;
+            min-height: 60px;
+            max-height: 120px;
+            resize: vertical;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+        .smart-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(6,182,212,0.15);
+        }
+        .smart-parse-btn {
+            border: none;
+            background: var(--primary);
+            color: var(--white);
+            padding: 12px 18px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .smart-parse-btn:active { transform: scale(0.95); }
         @keyframes voicePulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
             50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
@@ -1150,17 +1188,25 @@
 
             <!-- 手动录入表单 -->
             <div id="manualModeContent" style="display:none;">
-                <!-- 语音录入区 -->
+                <!-- 语音/文本智能录入区 -->
                 <div class="voice-input-section" id="voiceSection">
                     <div class="voice-header">
                         <i class="fas fa-microphone-alt"></i>
                         <span>语音快速录入</span>
                     </div>
-                    <div class="voice-desc">按住按钮说话，例如："康师傅红烧牛肉面 方便面 生产日期2025年6月1日 保质期6个月 A区2排"</div>
-                    <button type="button" class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()">
-                        <i class="fas fa-microphone"></i>
-                        <span id="voiceBtnText">点击说话</span>
-                    </button>
+                    <div class="voice-desc">点击下方输入框，用手机输入法的<span style="color:var(--primary);font-weight:600">语音输入</span>说话，自动解析填表</div>
+                    <div class="smart-input-wrap">
+                        <textarea class="smart-input" id="smartInput" placeholder="例如：康师傅红烧牛肉面 方便面 生产日期2025年6月1日 保质期6个月 A区2排" oninput="onSmartInputChange()"></textarea>
+                        <button type="button" class="smart-parse-btn" onclick="parseSmartInput()">
+                            <i class="fas fa-magic"></i> 解析
+                        </button>
+                    </div>
+                    <div class="voice-btn-row">
+                        <button type="button" class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()">
+                            <i class="fas fa-microphone"></i>
+                            <span id="voiceBtnText">在线语音</span>
+                        </button>
+                    </div>
                     <div class="voice-result" id="voiceResult" style="display:none;">
                         <div class="voice-result-text" id="voiceResultText"></div>
                         <div class="voice-result-hint" id="voiceResultHint"></div>
@@ -2423,9 +2469,35 @@
         }
     }
 
-    /* ========== 语音录入 ========== */
+    /* ========== 语音/智能文本录入 ========== */
     var voiceRecognition = null;
     var isRecording = false;
+
+    // 智能文本输入框变化时自动解析（延迟300ms）
+    var smartInputTimer = null;
+    window.onSmartInputChange = function() {
+        clearTimeout(smartInputTimer);
+        smartInputTimer = setTimeout(function() {
+            var text = document.getElementById('smartInput').value.trim();
+            if (text.length >= 5) {
+                parseSmartInput();
+            }
+        }, 500);
+    };
+
+    // 解析智能输入框文本并填充表单
+    window.parseSmartInput = function() {
+        var text = document.getElementById('smartInput').value.trim();
+        if (!text) {
+            showToast('请输入或语音说出商品信息', 'error');
+            return;
+        }
+        var parsed = parseVoiceText(text);
+        fillFormFromVoice(parsed, text);
+        // 显示结果区
+        document.getElementById('voiceResult').style.display = 'block';
+        document.getElementById('voiceResultText').textContent = text;
+    };
 
     window.toggleVoiceInput = function() {
         if (isRecording) {

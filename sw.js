@@ -3,7 +3,7 @@
  * 离线缓存策略：应用外壳预缓存 + 运行时 stale-while-revalidate
  * ===================================================== */
 
-const CACHE_NAME = 'shelflife-v7';
+const CACHE_NAME = 'shelflife-v8';
 
 /* 应用核心资源（相对路径，适配 GitHub Pages 子目录部署） */
 const CORE_ASSETS = [
