@@ -2685,12 +2685,17 @@
         remaining = remaining.replace(/\d{1,2}\s*月\s*\d{1,2}\s*[日号]/g, '');
         remaining = remaining.replace(/\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/g, '');
         remaining = remaining.replace(/生产日期\s*[:：]?\s*/g, '');
-        // 移除货架相关
+        // 移除货架相关 - 先移除"货架"关键词，再移除位置编码
+        remaining = remaining.replace(/货架/g, '');
         remaining = remaining.replace(/[A-Za-z]\s*[区排层栋号][\s\-]*\d*\s*[排层栋号]?[\s\-]*\d*\s*[层号]?/g, '');
-        remaining = remaining.replace(/货架\s*[A-Za-z0-9\s\-排层区栋号]+/g, '');
-        // 移除已识别的类别
+        // 移除已识别的类别 - 只移除作为独立词出现的类别（前后是空格/标点/开头/结尾）
+        // 不移除商品名内部的类别词（如"伊利纯牛奶"中的"牛奶"）
         if (result.category) {
-            remaining = remaining.replace(new RegExp(result.category, 'g'), '');
+            // 只移除开头和结尾的类别词，以及前后有空格分隔的类别词
+            var catEsc = result.category.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            remaining = remaining.replace(new RegExp('^' + catEsc + '[\\s，,、]+', 'g'), '');
+            remaining = remaining.replace(new RegExp('[\\s，,、]+' + catEsc + '$', 'g'), '');
+            remaining = remaining.replace(new RegExp('[\\s，,、]+' + catEsc + '[\\s，,、]+', 'g'), ' ');
         }
         // 清理
         remaining = remaining.replace(/[，,。、；;：:\s]+/g, ' ').trim();
