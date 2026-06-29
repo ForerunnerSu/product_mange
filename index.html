@@ -483,6 +483,73 @@
             background: var(--primary-bg);
         }
         .add-mode-tab i { margin-right: 6px; }
+
+        /* 语音录入区 */
+        .voice-input-section {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
+            padding: 20px 16px;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+        .voice-header {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+        .voice-header i { margin-right: 6px; }
+        .voice-desc {
+            font-size: 12px;
+            color: var(--gray-500);
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+        .voice-btn {
+            border: none;
+            background: var(--primary);
+            color: var(--white);
+            padding: 14px 32px;
+            border-radius: 50px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 14px rgba(6,182,212,0.4);
+        }
+        .voice-btn:active { transform: scale(0.95); }
+        .voice-btn.recording {
+            background: var(--danger);
+            box-shadow: 0 4px 14px rgba(239,68,68,0.4);
+            animation: voicePulse 1.2s infinite;
+        }
+        @keyframes voicePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+            50% { box-shadow: 0 0 0 12px rgba(239,68,68,0); }
+        }
+        .voice-result {
+            margin-top: 14px;
+            padding: 12px 14px;
+            background: var(--white);
+            border-radius: var(--radius-sm);
+            text-align: left;
+            box-shadow: var(--shadow-sm);
+        }
+        .voice-result-text {
+            font-size: 14px;
+            color: var(--gray-800);
+            line-height: 1.6;
+            word-break: break-all;
+        }
+        .voice-result-hint {
+            font-size: 12px;
+            color: var(--success);
+            margin-top: 6px;
+            font-weight: 600;
+        }
+        .voice-result-hint i { margin-right: 4px; }
+
         .form-card {
             background: var(--white);
             border-radius: var(--radius);
@@ -1083,6 +1150,23 @@
 
             <!-- 手动录入表单 -->
             <div id="manualModeContent" style="display:none;">
+                <!-- 语音录入区 -->
+                <div class="voice-input-section" id="voiceSection">
+                    <div class="voice-header">
+                        <i class="fas fa-microphone-alt"></i>
+                        <span>语音快速录入</span>
+                    </div>
+                    <div class="voice-desc">按住按钮说话，例如："康师傅红烧牛肉面 方便面 生产日期2025年6月1日 保质期6个月 A区2排"</div>
+                    <button type="button" class="voice-btn" id="voiceBtn" onclick="toggleVoiceInput()">
+                        <i class="fas fa-microphone"></i>
+                        <span id="voiceBtnText">点击说话</span>
+                    </button>
+                    <div class="voice-result" id="voiceResult" style="display:none;">
+                        <div class="voice-result-text" id="voiceResultText"></div>
+                        <div class="voice-result-hint" id="voiceResultHint"></div>
+                    </div>
+                </div>
+
                 <form class="form-card" id="productForm" onsubmit="handleProductSubmit(event)">
                     <div class="form-group">
                         <label><i class="fas fa-tag"></i> 商品名称 *</label>
@@ -2336,6 +2420,225 @@
             document.getElementById('calcStatus').textContent = status.label;
         } else {
             box.style.display = 'none';
+        }
+    }
+
+    /* ========== 语音录入 ========== */
+    var voiceRecognition = null;
+    var isRecording = false;
+
+    window.toggleVoiceInput = function() {
+        if (isRecording) {
+            stopVoiceInput();
+        } else {
+            startVoiceInput();
+        }
+    };
+
+    function startVoiceInput() {
+        var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            showToast('当前浏览器不支持语音识别，请使用Chrome浏览器', 'error');
+            return;
+        }
+
+        voiceRecognition = new SpeechRecognition();
+        voiceRecognition.lang = 'zh-CN';
+        voiceRecognition.continuous = false;
+        voiceRecognition.interimResults = true;
+
+        var btn = document.getElementById('voiceBtn');
+        var btnText = document.getElementById('voiceBtnText');
+        var resultDiv = document.getElementById('voiceResult');
+        var resultText = document.getElementById('voiceResultText');
+        var resultHint = document.getElementById('voiceResultHint');
+
+        btn.classList.add('recording');
+        btn.querySelector('i').className = 'fas fa-stop';
+        btnText.textContent = '正在聆听...点击停止';
+        isRecording = true;
+        resultDiv.style.display = 'block';
+        resultText.textContent = '请说话...';
+        resultHint.textContent = '';
+
+        voiceRecognition.onresult = function(event) {
+            var finalText = '';
+            var interimText = '';
+            for (var i = 0; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    finalText += event.results[i][0].transcript;
+                } else {
+                    interimText += event.results[i][0].transcript;
+                }
+            }
+            var displayText = finalText || interimText;
+            resultText.textContent = displayText;
+
+            if (finalText) {
+                var parsed = parseVoiceText(finalText);
+                fillFormFromVoice(parsed, finalText);
+            }
+        };
+
+        voiceRecognition.onerror = function(event) {
+            var msg = '语音识别出错';
+            if (event.error === 'no-speech') msg = '没有检测到语音，请重试';
+            else if (event.error === 'not-allowed') msg = '请允许麦克风权限';
+            resultText.textContent = msg;
+            resultHint.innerHTML = '';
+            stopVoiceInput();
+        };
+
+        voiceRecognition.onend = function() {
+            stopVoiceInput();
+        };
+
+        voiceRecognition.start();
+    }
+
+    function stopVoiceInput() {
+        if (voiceRecognition) {
+            try { voiceRecognition.stop(); } catch(e) {}
+        }
+        isRecording = false;
+        var btn = document.getElementById('voiceBtn');
+        var btnText = document.getElementById('voiceBtnText');
+        btn.classList.remove('recording');
+        btn.querySelector('i').className = 'fas fa-microphone';
+        btnText.textContent = '点击说话';
+    }
+
+    // 智能解析语音文本
+    function parseVoiceText(text) {
+        var result = { name: '', category: '', prodDate: '', shelfLife: '', shelf: '', notes: '' };
+        if (!text) return result;
+
+        var original = text;
+        text = text.replace(/\s+/g, ' ').trim();
+
+        // 1. 提取保质期："保质期365天" / "保质期6个月" / "保质期一年" / "365天"
+        var shelfLifeMatch = text.match(/保质期\s*(\d+)\s*个?\s*月/);
+        if (shelfLifeMatch) {
+            result.shelfLife = String(parseInt(shelfLifeMatch[1]) * 30);
+        } else {
+            shelfLifeMatch = text.match(/保质期\s*(\d+)\s*年/);
+            if (shelfLifeMatch) {
+                result.shelfLife = String(parseInt(shelfLifeMatch[1]) * 365);
+            } else {
+                shelfLifeMatch = text.match(/保质期\s*(\d+)\s*天/);
+                if (shelfLifeMatch) {
+                    result.shelfLife = shelfLifeMatch[1];
+                } else {
+                    shelfLifeMatch = text.match(/保质期\s*一\s*年/);
+                    if (shelfLifeMatch) result.shelfLife = '365';
+                    else if (/保质期\s*半\s*年/.test(text)) result.shelfLife = '180';
+                    else if (/保质期\s*一\s*个?\s*月/.test(text)) result.shelfLife = '30';
+                }
+            }
+        }
+
+        // 2. 提取生产日期："2025年6月1日" / "2025年6月1号" / "6月1号" / "2025-06-01"
+        var dateMatch = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]/);
+        if (dateMatch) {
+            result.prodDate = dateMatch[1] + '-' + padZero(dateMatch[2]) + '-' + padZero(dateMatch[3]);
+        } else {
+            dateMatch = text.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (dateMatch) {
+                result.prodDate = dateMatch[1] + '-' + padZero(dateMatch[2]) + '-' + padZero(dateMatch[3]);
+            } else {
+                dateMatch = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]/);
+                if (dateMatch) {
+                    var year = new Date().getFullYear();
+                    result.prodDate = year + '-' + padZero(dateMatch[1]) + '-' + padZero(dateMatch[2]);
+                }
+            }
+        }
+
+        // 3. 提取货架位置："A区2排3层" / "A区-2排" / "货架A区2排"
+        var shelfMatch = text.match(/([A-Za-z]\s*[区排层栋号][\s\-]*\d*\s*[排层栋号]?[\s\-]*\d*\s*[层号]?)/);
+        if (shelfMatch) {
+            result.shelf = shelfMatch[1].replace(/\s+/g, '').trim();
+        } else {
+            shelfMatch = text.match(/货架\s*([A-Za-z0-9\s\-排层区栋号]+)/);
+            if (shelfMatch) {
+                result.shelf = shelfMatch[1].replace(/\s+/g, '').trim();
+            }
+        }
+
+        // 4. 提取类别（匹配下拉选项）
+        var categories = ['面包','火腿肠','方便面','饮用水','饮料','膨化食品','牛奶','酸奶','零食','调味品','罐头','饼干','糖果','果冻','其他'];
+        for (var i = 0; i < categories.length; i++) {
+            if (text.indexOf(categories[i]) !== -1) {
+                result.category = categories[i];
+                break;
+            }
+        }
+
+        // 5. 提取商品名称 - 移除已识别的部分，剩余最可能的名称
+        var remaining = text;
+        // 移除保质期相关
+        remaining = remaining.replace(/保质期\s*\d+\s*[年月天个]*/g, '');
+        remaining = remaining.replace(/保质期\s*[一二半]\s*[年月个]*/g, '');
+        // 移除日期相关
+        remaining = remaining.replace(/\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*[日号]/g, '');
+        remaining = remaining.replace(/\d{1,2}\s*月\s*\d{1,2}\s*[日号]/g, '');
+        remaining = remaining.replace(/\d{4}[-\/]\d{1,2}[-\/]\d{1,2}/g, '');
+        remaining = remaining.replace(/生产日期\s*[:：]?\s*/g, '');
+        // 移除货架相关
+        remaining = remaining.replace(/[A-Za-z]\s*[区排层栋号][\s\-]*\d*\s*[排层栋号]?[\s\-]*\d*\s*[层号]?/g, '');
+        remaining = remaining.replace(/货架\s*[A-Za-z0-9\s\-排层区栋号]+/g, '');
+        // 移除已识别的类别
+        if (result.category) {
+            remaining = remaining.replace(new RegExp(result.category, 'g'), '');
+        }
+        // 清理
+        remaining = remaining.replace(/[，,。、；;：:\s]+/g, ' ').trim();
+
+        // 如果剩余文字有意义，作为商品名称
+        if (remaining && remaining.length >= 2) {
+            result.name = remaining;
+        }
+
+        return result;
+    }
+
+    function padZero(n) {
+        n = parseInt(n);
+        return n < 10 ? '0' + n : '' + n;
+    }
+
+    // 填充表单
+    function fillFormFromVoice(data, rawText) {
+        var filled = [];
+        if (data.name) {
+            document.getElementById('pName').value = data.name;
+            filled.push('名称');
+        }
+        if (data.category) {
+            document.getElementById('pCategory').value = data.category;
+            filled.push('类别');
+        }
+        if (data.prodDate) {
+            document.getElementById('pProdDate').value = data.prodDate;
+            filled.push('生产日期');
+        }
+        if (data.shelfLife) {
+            document.getElementById('pShelfLife').value = data.shelfLife;
+            filled.push('保质期' + data.shelfLife + '天');
+            // 触发自动计算
+            var event = new Event('input');
+            document.getElementById('pShelfLife').dispatchEvent(event);
+        }
+        if (data.shelf) {
+            document.getElementById('pShelf').value = data.shelf;
+            filled.push('货架');
+        }
+
+        var hint = document.getElementById('voiceResultHint');
+        if (filled.length > 0) {
+            hint.innerHTML = '<i class="fas fa-check-circle"></i> 已自动填充：' + filled.join('、');
+        } else {
+            hint.innerHTML = '<i class="fas fa-info-circle" style="color:var(--gray-500)"></i> 未能识别字段，请手动填写';
         }
     }
 
